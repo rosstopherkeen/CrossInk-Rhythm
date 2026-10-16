@@ -22,8 +22,6 @@ class XtcReaderMenuActivity final : public Activity {
     DELETE_CACHE,
     SEND_NEARBY_BOOK,
     DISABLE_TOUCHSCREEN,
-    READING_RHYTHM,
-    FINISHED_BOOKS,
   };
 
   XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title, bool hasChapters,

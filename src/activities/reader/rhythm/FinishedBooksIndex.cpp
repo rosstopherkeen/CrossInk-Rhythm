@@ -321,7 +321,10 @@ bool FinishedBooksIndex::record(const std::string& cachePath, const std::string&
     return false;
   }
 
-  const FinishedBookEntry updated{key, title, author, stats.totalReadingSeconds, stats.startDate, stats.finishedDate};
+  // Callers without author metadata (the stats screen) keep the stored author.
+  const std::string& keptAuthor = author.empty() && it != entries.end() ? it->author : author;
+  const FinishedBookEntry updated{
+      key, title, keptAuthor, stats.totalReadingSeconds, stats.startDate, stats.finishedDate};
   if (it != entries.end()) {
     if (it->title == updated.title && it->author == updated.author &&
         it->totalReadingSeconds == updated.totalReadingSeconds &&

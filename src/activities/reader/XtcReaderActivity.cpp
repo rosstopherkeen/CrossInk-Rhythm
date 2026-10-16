@@ -32,9 +32,7 @@
 #include "components/UITheme.h"
 #include "components/themes/lyra/LyraCarouselTheme.h"
 #include "fontIds.h"
-#include "rhythm/FinishedBooksActivity.h"
 #include "rhythm/FinishedBooksIndex.h"
-#include "rhythm/ReadingRhythmActivity.h"
 #include "util/BookCacheUtils.h"
 
 namespace {
@@ -990,20 +988,6 @@ void XtcReaderActivity::onReaderMenuConfirm(const int action) {
     case XtcReaderMenuActivity::MenuAction::READING_STATS:
       openReadingStats();
       break;
-    case XtcReaderMenuActivity::MenuAction::READING_RHYTHM:
-    case XtcReaderMenuActivity::MenuAction::FINISHED_BOOKS: {
-      std::unique_ptr<Activity> screen;
-      if (static_cast<XtcReaderMenuActivity::MenuAction>(action) == XtcReaderMenuActivity::MenuAction::READING_RHYTHM) {
-        screen = std::make_unique<ReadingRhythmActivity>(renderer, mappedInput);
-      } else {
-        screen = std::make_unique<FinishedBooksActivity>(renderer, mappedInput);
-      }
-      startActivityForResult(std::move(screen), [this](const ActivityResult&) {
-        resumeReadingStatsTimer("rhythm_stats_return");
-        requestUpdate();
-      });
-      break;
-    }
     case XtcReaderMenuActivity::MenuAction::TOGGLE_BOOK_STATS_TRACKING:
       if (xtc && SETTINGS.shouldTrackReadingStats()) {
         const bool enabled = !bookStatsEnabled;

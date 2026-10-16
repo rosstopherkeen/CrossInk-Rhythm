@@ -35,8 +35,6 @@ enum class EpubReaderMenuAction : uint8_t {
   SET_BOOK_DICTIONARY,
   STATUS_BAR_SETTINGS,
   RESET_BOOK_READER_SETTINGS,
-  READING_RHYTHM,
-  FINISHED_BOOKS,
 };
 
 enum class ReaderDrawerTab : uint8_t { Font = 0, Layout = 1, More = 2, Location = 3, Settings = 4, Count };
@@ -152,8 +150,6 @@ enum class ReaderDrawerCatalogItem : uint8_t {
   SyncProgress,
   NearbyPositionSync,
   SendNearbyBook,
-  ReadingRhythm,
-  FinishedBooks,
 };
 
 struct ReaderDrawerAvailability {
@@ -166,8 +162,6 @@ struct ReaderDrawerAvailability {
   bool buttonDevice = false;
   bool globalStatsEnabled = true;
   bool bookStatsEnabled = true;
-  // Reading Rhythm / Books Finished rows; off by default so existing catalogs are unchanged.
-  bool rhythmScreens = false;
 };
 
 struct ReaderDrawerTabCatalog {
@@ -212,10 +206,6 @@ constexpr ReaderDrawerCatalog makeReaderDrawerCatalog(const ReaderDrawerAvailabi
   if (available.buttonDevice && available.globalStatsEnabled && available.bookStatsEnabled)
     more.add(ReaderDrawerCatalogItem::ReadingStats);
   if (available.hasFootnotes) more.add(ReaderDrawerCatalogItem::Footnotes);
-  if (available.rhythmScreens && available.globalStatsEnabled) {
-    more.add(ReaderDrawerCatalogItem::ReadingRhythm);
-    more.add(ReaderDrawerCatalogItem::FinishedBooks);
-  }
 
   auto& location = catalog[static_cast<size_t>(ReaderDrawerTab::Location)];
   location.add(ReaderDrawerCatalogItem::BookmarkToggle);

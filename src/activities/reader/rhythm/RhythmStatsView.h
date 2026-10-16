@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "DailyMinutesLog.h"
@@ -10,26 +11,31 @@
 class GfxRenderer;
 class MappedInputManager;
 
-// Renderers for the Reading Rhythm and Books Finished screens.
+// Reading Rhythm and Books Finished pages of the Reading Stats screen.
 //
 // Ported from XPoint (https://github.com/Belphemur/XPoint, MIT):
 // BookStatsView.cpp renderReadingRhythmPage() / renderFinishedBooksPage().
 // Differences from XPoint:
+//   - cards use the Reading Stats header, insets and card metrics
+//     (statsPageFrame) and stretch to fill the screen instead of a fixed size.
 //   - read days come from GlobalReadingStats::readingHistoryBits; minutes come
 //     from the DailyMinutesLog sidecar instead of global_stats.bin v6.
-//   - days whose minutes are estimated (one-time backfill) are drawn lighter:
-//     outlined dots, a dithered light segment on weekly bars and a "~" prefix
-//     on the last-7-days values.
-//   - CrossInk compact header (with touch back button on touch devices).
+//   - estimated days (one-time backfill) are drawn lighter: outlined dots, a
+//     light bar segment and a "~" prefix on the last-7-days values.
+//   - the finished list fills the available height; it pages only when the
+//     books do not fit.
 namespace RhythmStatsView {
 
-constexpr size_t FINISHED_BOOKS_ENTRIES_PER_PAGE = 4;
+void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                             const GlobalReadingStats& stats, const DailyMinutesLog& minutes, bool showMoreButton);
 
-void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager& mappedInput,
-                             const GlobalReadingStats& stats, const DailyMinutesLog& minutes);
+// First entry index of each list page, from the same row metrics the renderer
+// uses. Always has at least one element.
+std::vector<uint16_t> paginateFinishedBooks(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                                            const std::vector<FinishedBookEntry>& finishedBooks);
 
-void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager& mappedInput,
-                             const std::vector<FinishedBookEntry>& finishedBooks, const GlobalReadingStats& globalStats,
-                             size_t pageIndex, size_t pageCount);
+void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                             const std::vector<FinishedBookEntry>& finishedBooks, uint32_t completedBooks,
+                             const std::vector<uint16_t>& pageStarts, size_t listPage);
 
 }  // namespace RhythmStatsView

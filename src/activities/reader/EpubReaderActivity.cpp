@@ -71,9 +71,7 @@
 #include "clippings/ClippingTextMatcher.h"
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
-#include "rhythm/FinishedBooksActivity.h"
 #include "rhythm/FinishedBooksIndex.h"
-#include "rhythm/ReadingRhythmActivity.h"
 #if CROSSINK_APP_CAP_TOUCH
 #include "components/TouchHeaderBackButton.h"
 #endif
@@ -4160,21 +4158,6 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuAction action, const 
                                                 estimatedTimeLeftSeconds, globalStats),
             [this, returnToReaderMenu](const ActivityResult&) { handleBookStatsReturn(returnToReaderMenu); });
       }
-      break;
-    }
-    case EpubReaderMenuAction::READING_RHYTHM:
-    case EpubReaderMenuAction::FINISHED_BOOKS: {
-      pauseReadingPaceTimer("rhythm_stats");
-      std::unique_ptr<Activity> screen;
-      if (action == EpubReaderMenuAction::READING_RHYTHM) {
-        screen = std::make_unique<ReadingRhythmActivity>(renderer, mappedInput);
-      } else {
-        screen = std::make_unique<FinishedBooksActivity>(renderer, mappedInput);
-      }
-      startActivityForResult(std::move(screen), [this](const ActivityResult&) {
-        resumeReadingPaceTimer("rhythm_stats_return");
-        requestUpdate();
-      });
       break;
     }
     case EpubReaderMenuAction::TOGGLE_BOOK_STATS_TRACKING: {

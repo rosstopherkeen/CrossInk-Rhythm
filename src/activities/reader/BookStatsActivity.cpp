@@ -6,6 +6,8 @@
 #include "MappedInputManager.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
+#include "rhythm/DailyMinutesBackfill.h"
+#include "rhythm/RhythmStatsView.h"
 #include "util/InputReleaseGuard.h"
 
 namespace {
@@ -81,6 +83,8 @@ void BookStatsActivity::saveStats() {
     return;
   }
   globalStats.save();
+  // Books Finished sidecar; the reader refreshes the author when it next records.
+  FinishedBooksIndex::record(bookCachePath, bookTitle, "", stats);
   refreshAllDevicesStats();
   didChangeStats = false;
 }
@@ -296,36 +300,85 @@ void BookStatsActivity::exitStatsActivity() {
   finish();
 }
 
+void BookStatsActivity::showPage(const Page newPage) {
+  if (newPage == Page::ReadingRhythm && !rhythmLoaded) {
+    // One-time minutes backfill runs here; read days come from this screen's stats.
+    rhythmMinutes =
+        DailyMinutesBackfill::runOnceIfNeeded(globalStats.readingHistoryAnchorDay, globalStats.readingHistoryBits);
+    rhythmLoaded = true;
+  }
+  if (newPage == Page::FinishedBooks) {
+    // Reloaded on every visit so completion edits made on this screen show up.
+    finishedBooks = FinishedBooksIndex::load(globalStats.completedBooks);
+    finishedPageStarts = RhythmStatsView::paginateFinishedBooks(renderer, &mappedInput, finishedBooks);
+    finishedListPage = 0;
+  }
+  page = newPage;
+  requestUpdate();
+}
+
+bool BookStatsActivity::showFinishedListPage(const int delta) {
+  const int target = static_cast<int>(finishedListPage) + delta;
+  if (target < 0 || target >= static_cast<int>(finishedPageStarts.size())) return false;
+  finishedListPage = static_cast<size_t>(target);
+  requestUpdate();
+  return true;
+}
+
 bool BookStatsActivity::showNextStatsPage() {
-  if (page == Page::PerBook) {
-    page = Page::ThisDevice;
-    requestUpdate();
-    return true;
+  switch (page) {
+    case Page::PerBook:
+      showPage(Page::ThisDevice);
+      return true;
+    case Page::ThisDevice:
+      showPage(showAllDevicesStats ? Page::AllDevices : Page::ReadingRhythm);
+      return true;
+    case Page::AllDevices:
+      showPage(Page::ReadingRhythm);
+      return true;
+    case Page::ReadingRhythm:
+      showPage(Page::FinishedBooks);
+      return true;
+    case Page::FinishedBooks:
+    case Page::EditDates:
+      return false;
   }
-
-  if (page == Page::ThisDevice && showAllDevicesStats) {
-    page = Page::AllDevices;
-    requestUpdate();
-    return true;
-  }
-
   return false;
 }
 
 bool BookStatsActivity::showPreviousStatsPage() {
-  if (page == Page::AllDevices) {
-    page = Page::ThisDevice;
-    requestUpdate();
-    return true;
+  switch (page) {
+    case Page::FinishedBooks:
+      showPage(Page::ReadingRhythm);
+      return true;
+    case Page::ReadingRhythm:
+      showPage(showAllDevicesStats ? Page::AllDevices : Page::ThisDevice);
+      return true;
+    case Page::AllDevices:
+      showPage(Page::ThisDevice);
+      return true;
+    case Page::ThisDevice:
+      showPage(Page::PerBook);
+      return true;
+    case Page::PerBook:
+    case Page::EditDates:
+      return false;
   }
-
-  if (page == Page::ThisDevice) {
-    page = Page::PerBook;
-    requestUpdate();
-    return true;
-  }
-
   return false;
+}
+
+int BookStatsActivity::pageIndicatorCount() const { return (showAllDevicesStats ? 3 : 2) + 2; }
+
+int BookStatsActivity::pageIndicatorIndex() const {
+  const int devicePages = showAllDevicesStats ? 3 : 2;
+  switch (page) {
+    case Page::ReadingRhythm:
+      return devicePages;
+    case Page::FinishedBooks:
+      return devicePages + 1;
+    default:
+      return static_cast<int>(page);
+  }
 }
 
 bool BookStatsActivity::selectEditFieldFromTouchTarget(const int touchTarget) {
@@ -473,12 +526,29 @@ void BookStatsActivity::loop() {
     return;
   }
 
+  if (page == Page::FinishedBooks) {
+    // The list pages first; past either end the stats pages take over.
+    if (swipe == MappedInputManager::SwipeDir::Up) {
+      showFinishedListPage(1);
+      return;
+    }
+    if (swipe == MappedInputManager::SwipeDir::Down) {
+      showFinishedListPage(-1);
+      return;
+    }
+    if (upOrLeftPressed && showFinishedListPage(-1)) return;
+    if (downOrRightPressed) {
+      showFinishedListPage(1);
+      return;
+    }
+  }
+
   if (upOrLeftPressed) {
     showPreviousStatsPage();
     return;
   }
 
-  if (page == Page::ThisDevice && showAllDevicesStats && downOrRightPressed) {
+  if (downOrRightPressed) {
     showNextStatsPage();
   }
 }
@@ -498,18 +568,24 @@ void BookStatsActivity::render(RenderLock&&) {
                              estimatedTimeLeftSeconds, true, hasEditableBook(), true);
       break;
     case Page::ThisDevice:
-      renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_THIS_DEVICE_SCREEN), globalStats, true,
-                            showAllDevicesStats);
+      renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_THIS_DEVICE_SCREEN), globalStats, true, true);
       break;
     case Page::AllDevices:
-      renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_ALL_DEVICES_SCREEN), allDevicesStats, true, false);
+      renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_ALL_DEVICES_SCREEN), allDevicesStats, true, true);
+      break;
+    case Page::ReadingRhythm:
+      RhythmStatsView::renderReadingRhythmPage(renderer, &mappedInput, globalStats, rhythmMinutes, true);
+      break;
+    case Page::FinishedBooks:
+      RhythmStatsView::renderFinishedBooksPage(renderer, &mappedInput, finishedBooks, globalStats.completedBooks,
+                                               finishedPageStarts, finishedListPage);
       break;
     case Page::EditDates:
       renderEditBookDatesPage(renderer, &mappedInput, bookTitle, stats, selectedEditField, true);
       break;
   }
   if (page != Page::EditDates) {
-    drawPageIndicators(renderer, static_cast<int>(page), showAllDevicesStats ? 3 : 2);
+    drawPageIndicators(renderer, pageIndicatorIndex(), pageIndicatorCount());
   }
   renderer.displayBuffer();
 }

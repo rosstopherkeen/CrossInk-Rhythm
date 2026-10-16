@@ -3,13 +3,16 @@
 #include <HalClock.h>
 
 #include <string>
+#include <vector>
 
 #include "../Activity.h"
 #include "BookReadingStats.h"
 #include "GlobalReadingStats.h"
+#include "rhythm/DailyMinutesLog.h"
+#include "rhythm/FinishedBooksIndex.h"
 
 class BookStatsActivity final : public Activity {
-  enum class Page : uint8_t { PerBook, ThisDevice, AllDevices, EditDates };
+  enum class Page : uint8_t { PerBook, ThisDevice, AllDevices, EditDates, ReadingRhythm, FinishedBooks };
 
   std::string bookTitle;
   std::string bookCachePath;
@@ -32,6 +35,12 @@ class BookStatsActivity final : public Activity {
   bool ignoreInitialBackRelease = false;
   bool ignoreInitialConfirmRelease = false;
   bool ignoreInitialPowerRelease = false;
+  // Reading Rhythm / Books Finished pages, loaded when first shown.
+  DailyMinutesLog rhythmMinutes;
+  bool rhythmLoaded = false;
+  std::vector<FinishedBookEntry> finishedBooks;
+  std::vector<uint16_t> finishedPageStarts;
+  size_t finishedListPage = 0;
 
   bool hasEditableBook() const { return !bookCachePath.empty() && halClock.isAvailable(); }
   bool usesNoRtcSingleScreenLayout() const { return !halClock.isAvailable(); }
@@ -50,6 +59,10 @@ class BookStatsActivity final : public Activity {
   bool showPreviousStatsPage();
   bool showNextStatsPage();
   bool selectEditFieldFromTouchTarget(int touchTarget);
+  void showPage(Page newPage);
+  bool showFinishedListPage(int delta);
+  int pageIndicatorIndex() const;
+  int pageIndicatorCount() const;
 
  public:
   BookStatsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
