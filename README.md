@@ -162,6 +162,25 @@ See [Testing and Debugging](./docs/development/testing-debugging.md) for serial 
 
 ---
 
+## Reading Rhythm and Books Finished (CrossInk-Rhythm)
+
+This fork ([rosstopherkeen/CrossInk-Rhythm](https://github.com/rosstopherkeen/CrossInk-Rhythm)) adds two stats screens on top of CrossInk, reachable from the reader menu (EPUB drawer More tab, XTC menu) and from Settings > System > Reading Stats:
+
+- **Reading Rhythm**: recent activity dot grid (13 weeks), weekly reading time bars, and reading days per month for the last 12 months.
+- **Books Finished**: total reading time plus a paged list of finished books with start and finish dates and time spent.
+
+Existing stats files are never changed: `global_stats.bin` stays at version 3 and `stats_v5.bin` is only read, so stock CrossInk can still read the same SD card. New data lives in two sidecar files, `/.crosspoint/daily_minutes.bin` and `/.crosspoint/finished_books.bin` (see [file formats](./docs/file-formats.md)). Minutes for days read before this firmware was installed are a one-time estimate and are drawn lighter (outlined dots, light bar segments, `~` values).
+
+Over-the-air updates for this fork come from [its releases](https://github.com/rosstopherkeen/CrossInk-Rhythm/releases).
+
+### Credits
+
+- [CrossInk](https://github.com/uxjulia/CrossInk) by uxjulia, the base of this fork.
+- The Reading Rhythm and Books Finished screens are ported from [XPoint](https://github.com/Belphemur/XPoint) (MIT License, Copyright (c) 2025 CrossPoint Reader organization): `ReadingRhythmActivity`, `FinishedBooksActivity`, `FinishedBooksIndex`, and `renderReadingRhythmPage` / `renderFinishedBooksPage` from `BookStatsView.cpp`.
+- [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader), the upstream firmware.
+
+---
+
 ## Notice on Contributions
 
 This repository does not accept pull requests. Feature requests may be opened in [discussions](https://github.com/uxjulia/CrossInk/discussions), but major features requiring ongoing support should be directed upstream to [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader).

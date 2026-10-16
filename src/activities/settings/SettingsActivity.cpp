@@ -40,6 +40,8 @@
 #include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/reader/GlobalReadingStats.h"
+#include "activities/reader/rhythm/FinishedBooksActivity.h"
+#include "activities/reader/rhythm/ReadingRhythmActivity.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -1167,6 +1169,12 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::BackupStats:
         startActivityForResult(std::make_unique<BackupStatsActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::ReadingRhythm:
+        startActivityForResult(std::make_unique<ReadingRhythmActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::FinishedBooks:
+        startActivityForResult(std::make_unique<FinishedBooksActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::ResetGlobalStats:
         startActivityForResult(

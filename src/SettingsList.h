@@ -1093,10 +1093,12 @@ inline std::vector<SettingInfo> buildFileBrowserSettingsList(const std::vector<S
 
 inline std::vector<SettingInfo> buildSystemReadingStatsSettingsList(const std::vector<SettingInfo>& allSettings) {
   std::vector<SettingInfo> settings;
-  settings.reserve(3);
+  settings.reserve(5);
   addSettingByName(settings, allSettings, StrId::STR_TRACK_READING_STATS);
   if (!SETTINGS.shouldTrackReadingStats()) return settings;
   settings.push_back(SettingInfo::Submenu(StrId::STR_ALL_TIME_STATS, SettingAction::SystemGlobalStats));
+  settings.push_back(SettingInfo::Action(StrId::STR_READING_RHYTHM, SettingAction::ReadingRhythm));
+  settings.push_back(SettingInfo::Action(StrId::STR_BOOKS_FINISHED, SettingAction::FinishedBooks));
   addSettingByName(settings, allSettings, StrId::STR_IDLE_TIME_THRESHOLD);
   return settings;
 }

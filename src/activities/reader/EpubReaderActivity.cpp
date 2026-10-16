@@ -71,6 +71,9 @@
 #include "clippings/ClippingTextMatcher.h"
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
+#include "rhythm/FinishedBooksActivity.h"
+#include "rhythm/FinishedBooksIndex.h"
+#include "rhythm/ReadingRhythmActivity.h"
 #if CROSSINK_APP_CAP_TOUCH
 #include "components/TouchHeaderBackButton.h"
 #endif
@@ -1931,6 +1934,8 @@ void EpubReaderActivity::applyBookStatsEditsFromDisk() {
 
 void EpubReaderActivity::handleBookStatsReturn(const bool returnToReaderMenu) {
   applyBookStatsEditsFromDisk();
+  // Date edits or completion changes made on the stats screen.
+  if (epub) FinishedBooksIndex::record(epub->getCachePath(), epub->getTitle(), epub->getAuthor(), stats);
   completionPromptShown = stats.isCompleted;
   if (stats.isCompleted && SETTINGS.moveFinishedToReadFolder && epub && !isInReadFolder(epub->getPath())) {
     pendingReadFolderMove = true;
@@ -4157,6 +4162,21 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuAction action, const 
       }
       break;
     }
+    case EpubReaderMenuAction::READING_RHYTHM:
+    case EpubReaderMenuAction::FINISHED_BOOKS: {
+      pauseReadingPaceTimer("rhythm_stats");
+      std::unique_ptr<Activity> screen;
+      if (action == EpubReaderMenuAction::READING_RHYTHM) {
+        screen = std::make_unique<ReadingRhythmActivity>(renderer, mappedInput);
+      } else {
+        screen = std::make_unique<FinishedBooksActivity>(renderer, mappedInput);
+      }
+      startActivityForResult(std::move(screen), [this](const ActivityResult&) {
+        resumeReadingPaceTimer("rhythm_stats_return");
+        requestUpdate();
+      });
+      break;
+    }
     case EpubReaderMenuAction::TOGGLE_BOOK_STATS_TRACKING: {
       if (!epub || !SETTINGS.shouldTrackReadingStats()) break;
       const bool enabled = !bookStatsEnabled;
@@ -5644,6 +5664,7 @@ void EpubReaderActivity::setBookCompleted(bool isCompleted) {
   }
   refreshCachedTimeLeftEstimate();
   if (!stats.save(epub->getCachePath())) return;
+  FinishedBooksIndex::record(epub->getCachePath(), epub->getTitle(), epub->getAuthor(), stats);
   if (statsTrackingActive) {
     if (isCompleted) {
       globalStats.completedBooks++;

@@ -546,6 +546,69 @@ Binary layout:
 - `[41-68]` `dayOfWeekSeconds[7]` (`uint32_t` LE each)
 - `[69-72]` `estimatedTimeLeftSeconds` (`uint32_t` LE, `0` means unavailable)
 
+## `/.crosspoint/daily_minutes.bin`
+
+### Version 1
+
+Sidecar for the Reading Rhythm screen (ported from XPoint). It holds reading
+minutes per day for the most recent 91 days. Read days themselves still come
+from `readingHistoryBits` in `global_stats.bin`, which this file never changes,
+so `global_stats.bin` stays at version 3 and stock CrossInk can read it.
+
+Real minutes are added when a reading session is committed. Estimated minutes
+come from a one-time backfill for days read before the first real recording and
+are stored separately, so a real value for the same day always wins.
+
+Writes go to `daily_minutes.bin.tmp`, are re-read and compared byte for byte,
+then the old file is rotated to `daily_minutes.bin.bak` and the temp file is
+renamed into place. Loading falls back to the `.bak` file. A file with a newer
+version byte is never overwritten.
+
+Binary layout (380 bytes, little-endian):
+
+- `[0-3]` magic `CIDM`
+- `[4]` version (`1`)
+- `[5]` flags (`bit0=backfillDone`)
+- `[6-7]` window days (`uint16_t`, `91`)
+- `[8-11]` `anchorDay` (`uint32_t`, days since 2000-01-01 of slot 0; `0` = empty)
+- `[12-15]` `firstRealDay` (`uint32_t`, first day with a real recording; `0` = none)
+- `[16-197]` `realMinutes[91]` (`uint16_t` each; slot 0 = `anchorDay`, higher = older)
+- `[198-379]` `estimatedMinutes[91]` (`uint16_t` each, same indexing)
+
+Values above 1440 are clamped on load.
+
+## `/.crosspoint/finished_books.bin`
+
+### Version 3
+
+Sidecar index for the Books Finished screen, using XPoint's `CPFB` v3 layout.
+At most 32 entries, sorted newest finish date first. Same atomic write and
+`.bak` fallback as `daily_minutes.bin`; a newer version is never overwritten.
+
+CrossInk keys entries by FNV-1a 64-bit over the book's cache directory (for
+example `/.crosspoint/epub_<hash>`) instead of the book path, so entries found
+by scanning `epub_*` caches match entries recorded from the reader. When a book
+and its cache move, the key is re-computed.
+
+The index is seeded from Recent Books plus a scan of
+`/.crosspoint/epub_*/stats_v5.bin` (read only) the first time it is needed,
+and rescanned once per boot when `completedBooks` in `global_stats.bin` is
+larger than the number of entries.
+
+Binary layout (little-endian):
+
+- `[0-3]` magic `CPFB`
+- `[4]` version (`3`; versions 1-2 are read)
+- `[5]` entry count (`uint8_t`, at most 32)
+- `[6-7]` reserved (`0`)
+- per entry:
+  - `uint64_t` key
+  - `uint32_t` `totalReadingSeconds`
+  - start date (`year uint16_t`, `month uint8_t`, `day uint8_t`; absent in v1)
+  - finish date (`year uint16_t`, `month uint8_t`, `day uint8_t`)
+  - `uint16_t` title length + UTF-8 bytes (at most 160)
+  - `uint16_t` author length + UTF-8 bytes (at most 120; absent before v3)
+
 ## `section.bin`
 
 ### Version 83

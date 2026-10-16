@@ -448,7 +448,7 @@ void EpubReaderDrawerActivity::onEnter() {
 
   const ReaderDrawerCatalog catalog = makeReaderDrawerCatalog(
       {hasFootnotes, hasDictionary, hasBookmarks, hasClippings, showReadingPaceReset, stablePageCount > 0,
-       !mappedInput.hasTouchHardware(), globalStatsEnabled, bookStatsEnabled});
+       !mappedInput.hasTouchHardware(), globalStatsEnabled, bookStatsEnabled, /*rhythmScreens=*/true});
   for (size_t tab = 0; tab < rootRows.size(); ++tab) {
     rootRows[tab].reserve(catalog[tab].count);
     rootRows[tab].assign(catalog[tab].items.begin(), catalog[tab].items.begin() + catalog[tab].count);
@@ -1796,6 +1796,12 @@ void EpubReaderDrawerActivity::activateRow(const RowId row) {
     case RowId::ReadingStats:
       action = EpubReaderMenuAction::READING_STATS;
       break;
+    case RowId::ReadingRhythm:
+      action = EpubReaderMenuAction::READING_RHYTHM;
+      break;
+    case RowId::FinishedBooks:
+      action = EpubReaderMenuAction::FINISHED_BOOKS;
+      break;
     case RowId::SyncProgress:
       action = EpubReaderMenuAction::SYNC;
       break;
@@ -3045,6 +3051,10 @@ const char* EpubReaderDrawerActivity::rowLabel(const RowId row) const {
       return tr(STR_AUTO_TURN_INTERVAL_SECONDS);
     case RowId::ReadingStats:
       return tr(STR_READING_STATS);
+    case RowId::ReadingRhythm:
+      return tr(STR_READING_RHYTHM);
+    case RowId::FinishedBooks:
+      return tr(STR_BOOKS_FINISHED);
     case RowId::SyncProgress:
       return tr(STR_SYNC_PROGRESS);
     case RowId::NearbyPositionSync:

@@ -1,3 +1,15 @@
+## [Unreleased]
+
+### Added
+
+- Reading Rhythm screen: recent activity dot grid, weekly reading time bars, and reading days per month for the last 12 months. Ported from XPoint. Open it from the reader menu or Settings > System > Reading Stats.
+- Books Finished screen: total reading time and a paged list of finished books with start and finish dates and time spent. Ported from XPoint. Finished books that dropped out of Recent Books are found by scanning existing book caches.
+- Daily reading minutes are now recorded for the Reading Rhythm screen. Minutes for days read before updating are estimated once from each book's reading time and shown lighter.
+
+### Changed
+
+- Over-the-air updates now check this fork's releases (rosstopherkeen/CrossInk-Rhythm).
+
 ## [v1.6.1] - 2026-10-03
 
 ### Added

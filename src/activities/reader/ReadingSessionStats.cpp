@@ -1,5 +1,7 @@
 #include "ReadingSessionStats.h"
 
+#include "rhythm/DailyMinutesLog.h"
+
 void commitReadingSession(BookReadingStats& book, GlobalReadingStats& global, const uint32_t seconds,
                           const ReadingStatsDateTime* sessionStart) {
   // Page intervals longer than the idle threshold are rejected before they
@@ -14,6 +16,8 @@ void commitReadingSession(BookReadingStats& book, GlobalReadingStats& global, co
   if (!sessionStart) return;
   book.recordReadingSpan(*sessionStart, seconds);
   global.recordReadingSpan(*sessionStart, seconds);
+  // Reading Rhythm sidecar (daily_minutes.bin); global_stats.bin is unchanged.
+  DailyMinutesLog::recordSpanAndSave(*sessionStart, seconds);
   if (seconds >= 120 && !book.startDateManual && !book.startDate.isValid()) {
     book.startDate = sessionStart->date;
   }
