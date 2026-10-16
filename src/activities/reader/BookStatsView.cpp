@@ -755,3 +755,49 @@ void renderEditBookDatesPage(GfxRenderer& renderer, const MappedInputManager* ma
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
   }
 }
+
+StatsPageFrame statsPageFrame(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                              const bool showButtonHints, const int minContentHeight, const int cardCount) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int availableHeight =
+      renderer.getScreenHeight() - metrics.topPadding - statsBottomInset(metrics, showButtonHints);
+  const int gaps = std::max(0, cardCount - 1);
+  const auto contentHeight = [&](const StatsLayout& layout) {
+    return statsHeaderHeight(metrics, layout, mappedInput) + layout.topGap + minContentHeight + gaps * layout.cardGap;
+  };
+  // Same card spacing as the This Device page, unless this page needs more room.
+  const StatsLayout& deviceLayout =
+      getStatsLayout(renderer, mappedInput, true, showButtonHints, shouldShowRtcBasedStats());
+  const StatsLayout& layout = contentHeight(deviceLayout) <= availableHeight ? deviceLayout : kCompactLayout;
+
+  StatsPageFrame frame;
+  frame.cardX = metrics.contentSidePadding;
+  frame.cardW = renderer.getScreenWidth() - metrics.contentSidePadding * 2;
+  frame.top = metrics.topPadding + statsHeaderHeight(metrics, layout, mappedInput) + layout.topGap;
+  frame.bottom = renderer.getScreenHeight() - statsBottomInset(metrics, showButtonHints);
+  frame.cardGap = layout.cardGap;
+  frame.titleH = layout.sectionTitleH;
+  return frame;
+}
+
+void drawStatsPageHeader(GfxRenderer& renderer, const MappedInputManager* mappedInput, const char* title) {
+  renderer.clearScreen();
+  if (mappedInput && mappedInput->hasTouchHardware()) {
+    TouchHeaderBackButton::drawCompact(renderer, title, false);
+  } else {
+    CompactHeader::drawTitle(renderer, title);
+  }
+}
+
+void drawStatsCardFrame(const GfxRenderer& renderer, const int x, const int y, const int w, const int h,
+                        const char* title, const int titleH) {
+  renderer.drawRect(x, y, w, h);
+  renderer.drawLine(x, y + titleH, x + w, y + titleH);
+  drawCenteredLabel(renderer, UI_10_FONT_ID, x, w, y + (titleH - renderer.getLineHeight(UI_10_FONT_ID)) / 2, title,
+                    true);
+}
+
+void drawStatsValueCell(const GfxRenderer& renderer, const int x, const int w, const int y, const int h,
+                        const char* value, const char* label) {
+  drawStatCell(renderer, x, w, y, h, value, label);
+}

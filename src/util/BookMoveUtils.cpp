@@ -16,6 +16,7 @@
 #include "ClippingStore.h"
 #include "CrossPointState.h"
 #include "RecentBooksStore.h"
+#include "activities/reader/rhythm/FinishedBooksIndex.h"
 
 namespace {
 constexpr char READ_FOLDER[] = "/Read";
@@ -278,6 +279,8 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
   }
 
   commitMetadata();
+  // Books Finished entries are keyed by cache dir; follow the move (non-fatal).
+  if (cacheMoved) FinishedBooksIndex::migrateCachePath(oldCachePath, newCachePath);
 
   return RenameMigrationResult::Success;
 }
@@ -293,6 +296,8 @@ bool migrateMovedEpubState(const std::string& oldPath, const std::string& newPat
       LOG_ERR("BookMove", "Failed to rename cache dir %s -> %s (non-fatal)", oldCachePath.c_str(),
               newCachePath.c_str());
       ok = false;
+    } else {
+      FinishedBooksIndex::migrateCachePath(oldCachePath, newCachePath);
     }
   }
 

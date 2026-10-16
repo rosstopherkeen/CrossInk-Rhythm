@@ -71,6 +71,7 @@
 #include "clippings/ClippingTextMatcher.h"
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
+#include "rhythm/FinishedBooksIndex.h"
 #if CROSSINK_APP_CAP_TOUCH
 #include "components/TouchHeaderBackButton.h"
 #endif
@@ -1931,6 +1932,8 @@ void EpubReaderActivity::applyBookStatsEditsFromDisk() {
 
 void EpubReaderActivity::handleBookStatsReturn(const bool returnToReaderMenu) {
   applyBookStatsEditsFromDisk();
+  // Date edits or completion changes made on the stats screen.
+  if (epub) FinishedBooksIndex::record(epub->getCachePath(), epub->getTitle(), epub->getAuthor(), stats);
   completionPromptShown = stats.isCompleted;
   if (stats.isCompleted && SETTINGS.moveFinishedToReadFolder && epub && !isInReadFolder(epub->getPath())) {
     pendingReadFolderMove = true;
@@ -5644,6 +5647,7 @@ void EpubReaderActivity::setBookCompleted(bool isCompleted) {
   }
   refreshCachedTimeLeftEstimate();
   if (!stats.save(epub->getCachePath())) return;
+  FinishedBooksIndex::record(epub->getCachePath(), epub->getTitle(), epub->getAuthor(), stats);
   if (statsTrackingActive) {
     if (isCompleted) {
       globalStats.completedBooks++;

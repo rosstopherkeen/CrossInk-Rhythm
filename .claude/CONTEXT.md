@@ -16,6 +16,7 @@ Refer to https://freeink.org/llms.txt for guidance.
   - JPEGDEC stub always fails; `JPEGDEC fallback: open failed (err=-1)` is expected in simulator.
   - `esp_deep_sleep_start()` is a no-op in simulator.
   - `HalStorage` uses POSIX file access under `./fs_` and allows multiple readers, unlike real hardware.
+  - `lib/HalClockSim` always reports no date, so RTC-dependent stats paths (daily minutes, Reading Rhythm backfill) never run in the simulator; cover them with host tests.
 
 ## Real Hardware / Storage
 
@@ -41,6 +42,9 @@ Refer to https://freeink.org/llms.txt for guidance.
   (~30KB incl. 16KB contiguous scratch) dominates and is skipped below 80KB free.
 
 ## Misc Repo Gotchas
+
+- Reading Rhythm / Books Finished data lives only in sidecars (`daily_minutes.bin`, `finished_books.bin`, code in `src/activities/reader/rhythm/`); never bump `global_stats.bin` (v3) or `stats_v5.bin` for them.
+- `pio run` needs Python >= 3.10 and PlatformIO 6.1.x; PlatformIO 6.2.0 swaps tool-scons and breaks the ESP32-C3 link (`No module named 'SCons.Tool.FortranCommon'`).
 
 - POSIX TZ signs are inverted from ISO 8601 in `TimeStore::applyTimezone()`: `"UTC-1"` means UTC+1.
 - `LyraTheme::drawHeader()` does not call `BaseTheme::drawHeader()`, so header changes in the base theme must be duplicated in Lyra if needed.

@@ -32,6 +32,7 @@
 #include "components/UITheme.h"
 #include "components/themes/lyra/LyraCarouselTheme.h"
 #include "fontIds.h"
+#include "rhythm/FinishedBooksIndex.h"
 #include "util/BookCacheUtils.h"
 
 namespace {
@@ -814,7 +815,9 @@ void XtcReaderActivity::setBookCompleted(const bool isCompleted) {
     }
   }
 
-  if (stats.save(xtc->getCachePath()) && statsTrackingActive) {
+  const bool saved = stats.save(xtc->getCachePath());
+  if (saved) FinishedBooksIndex::record(xtc->getCachePath(), xtc->getTitle(), xtc->getAuthor(), stats);
+  if (saved && statsTrackingActive) {
     if (isCompleted) {
       globalStats.completedBooks++;
     } else if (globalStats.completedBooks > 0) {
@@ -918,6 +921,8 @@ void XtcReaderActivity::openReadingStats() {
   }
   startActivityForResult(std::move(bookStats), [this](const ActivityResult&) {
     applyBookStatsEditsFromDisk();
+    // Date edits or completion changes made on the stats screen.
+    if (xtc) FinishedBooksIndex::record(xtc->getCachePath(), xtc->getTitle(), xtc->getAuthor(), stats);
     resumeReadingStatsTimer("book_stats_return");
     requestUpdate();
   });
