@@ -10,6 +10,7 @@
 #include <cstring>
 #include <vector>
 
+#include "FinishedBooksIndex.h"
 #include "RecentBooksStore.h"
 
 namespace {
@@ -70,6 +71,32 @@ std::string cachePathForBookPath(const std::string& bookPath) {
   if (FsHelpers::hasEpubExtension(bookPath)) return Epub::cachePathForFilePath(bookPath, CACHE_ROOT);
   if (FsHelpers::hasXtcExtension(bookPath)) return Xtc(bookPath, CACHE_ROOT).getCachePath();
   return {};
+}
+
+bool findCachePathForKey(const uint64_t key, std::string& outCachePath) {
+  HalFile dir = Storage.open(CACHE_ROOT);
+  if (!dir) return false;
+  if (!dir.isDirectory()) {
+    dir.close();
+    return false;
+  }
+  char name[96];
+  bool found = false;
+  for (HalFile entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
+    const bool isDirectory = entry.isDirectory();
+    const size_t nameLen = entry.getName(name, sizeof(name));
+    entry.close();
+    if (!isDirectory || nameLen == 0) continue;
+    const std::string candidate = std::string(CACHE_ROOT) + "/" + name;
+    if (FinishedBooksIndex::keyForCachePath(candidate) == key) {
+      outCachePath = candidate;
+      found = true;
+      break;
+    }
+  }
+  dir.close();
+  if (!found) LOG_ERR(LOG_TAG, "No cache directory for finished book key %llx", static_cast<unsigned long long>(key));
+  return found;
 }
 
 void forEach(const Visitor visit, void* ctx) {

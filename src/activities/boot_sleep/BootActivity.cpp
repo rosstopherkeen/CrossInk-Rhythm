@@ -16,7 +16,7 @@
 #include "CrossPointState.h"
 #include "ImageFolderIndex.h"
 #include "fontIds.h"
-#include "images/Logo120.h"
+#include "images/BootRhythm.h"
 
 namespace {
 
@@ -114,15 +114,25 @@ bool tryDrawRotatingBootImage(const GfxRenderer& renderer) {
   return pickAndDraw(true);
 }
 
+// CrossInk-Rhythm boot screen: full-screen 1-bit image (src/images/boot-rhythm.bmp)
+// stored as per-row run lengths by scripts/bmp_to_boot_header.py (~22 KB of
+// flash instead of 48 KB). Each black run is one fillRect.
 void drawDefaultBootLogo(const GfxRenderer& renderer) {
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
+  const int originX = (renderer.getScreenWidth() - BOOT_RHYTHM_WIDTH) / 2;
+  const int originY = (renderer.getScreenHeight() - BOOT_RHYTHM_HEIGHT) / 2;
 
   renderer.clearScreen();
-  renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSINK), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_BOOTING));
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 30, AppVersion::version());
+  size_t pos = 0;
+  for (int y = 0; y < BOOT_RHYTHM_HEIGHT; ++y) {
+    int x = 0;
+    bool black = false;
+    while (x < BOOT_RHYTHM_WIDTH && pos < BOOT_RHYTHM_RUNS_SIZE) {
+      const int run = BootRhythmRuns[pos++];
+      if (black && run > 0) renderer.fillRect(originX + x, originY + y, run, 1, true);
+      x += run;
+      black = !black;
+    }
+  }
 }
 
 }  // namespace

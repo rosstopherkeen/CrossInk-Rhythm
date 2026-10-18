@@ -3,12 +3,14 @@
 ### Added
 
 - Reading Rhythm page in Reading Stats: recent activity dot grid, weekly reading time bars, and reading days per month for the last 12 months. Ported from XPoint.
-- Books Finished page in Reading Stats: totals plus a list of finished books with start and finish dates and time spent, sized to the screen. Ported from XPoint. Finished books that dropped out of Recent Books are found by scanning existing book caches.
+- Books Finished page in Reading Stats: totals plus a scrollable list (with scroll bar) of finished books with start and finish dates and time spent. Tap a book, or select it and press Confirm, to open its stats. Ported from XPoint. Finished books that dropped out of Recent Books are found by scanning existing book caches.
+- New CrossInk-Rhythm boot screen.
 - Daily reading minutes are now recorded for the Reading Rhythm screen. Minutes for days read before updating are estimated once from each book's reading time and shown lighter.
 
 ### Changed
 
 - Over-the-air updates now check this fork's releases (rosstopherkeen/CrossInk-Rhythm).
+- Settings shows the firmware as "CrossInk-Rhythm v<version>".
 
 ## [v1.6.1] - 2026-10-03
 
