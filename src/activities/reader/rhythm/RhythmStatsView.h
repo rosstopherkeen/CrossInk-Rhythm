@@ -22,20 +22,26 @@ class MappedInputManager;
 //     from the DailyMinutesLog sidecar instead of global_stats.bin v6.
 //   - estimated days (one-time backfill) are drawn lighter: outlined dots, a
 //     light bar segment and a "~" prefix on the last-7-days values.
-//   - the finished list fills the available height; it pages only when the
-//     books do not fit.
+//   - the finished list is a vertical scroll panel with a scroll bar; rows
+//     open that book's stats.
 namespace RhythmStatsView {
 
 void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
                              const GlobalReadingStats& stats, const DailyMinutesLog& minutes, bool showMoreButton);
 
-// First entry index of each list page, from the same row metrics the renderer
-// uses. Always has at least one element.
-std::vector<uint16_t> paginateFinishedBooks(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
-                                            const std::vector<FinishedBookEntry>& finishedBooks);
+// Touch ids for finished-book rows: FINISHED_ROW_TOUCH_BASE + entry index.
+constexpr int FINISHED_ROW_TOUCH_BASE = 100;
 
+// Books that fit in the list panel when scrolled to `top` (at least 1 when any).
+size_t finishedVisibleCount(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                            const std::vector<FinishedBookEntry>& finishedBooks, size_t top);
+// Largest useful scroll position: the first top that shows the last book.
+size_t finishedMaxTop(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                      const std::vector<FinishedBookEntry>& finishedBooks);
+
+// Totals card plus a scrollable list; `selected` is outlined (-1 for none).
 void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
-                             const std::vector<FinishedBookEntry>& finishedBooks, uint32_t completedBooks,
-                             const std::vector<uint16_t>& pageStarts, size_t listPage);
+                             const std::vector<FinishedBookEntry>& finishedBooks, uint32_t completedBooks, size_t top,
+                             int selected);
 
 }  // namespace RhythmStatsView

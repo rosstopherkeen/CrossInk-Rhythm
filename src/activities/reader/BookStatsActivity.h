@@ -39,8 +39,8 @@ class BookStatsActivity final : public Activity {
   DailyMinutesLog rhythmMinutes;
   bool rhythmLoaded = false;
   std::vector<FinishedBookEntry> finishedBooks;
-  std::vector<uint16_t> finishedPageStarts;
-  size_t finishedListPage = 0;
+  size_t finishedTop = 0;     // first book shown in the scroll panel
+  int finishedSelected = -1;  // outlined row; -1 until a button selects one
 
   bool hasEditableBook() const { return !bookCachePath.empty() && halClock.isAvailable(); }
   bool usesNoRtcSingleScreenLayout() const { return !halClock.isAvailable(); }
@@ -60,7 +60,10 @@ class BookStatsActivity final : public Activity {
   bool showNextStatsPage();
   bool selectEditFieldFromTouchTarget(int touchTarget);
   void showPage(Page newPage);
-  bool showFinishedListPage(int delta);
+  void reloadFinishedBooks();
+  void moveFinishedSelection(int delta);
+  void scrollFinishedList(int direction);
+  void openFinishedBook(size_t index);
   int pageIndicatorIndex() const;
   int pageIndicatorCount() const;
 

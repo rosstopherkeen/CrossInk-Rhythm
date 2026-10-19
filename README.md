@@ -2,7 +2,7 @@
 
 > A personal fork of [CrossInk](https://github.com/uxjulia/CrossInk) for the **Xteink X4 Pro** that adds two reading stats pages: **Reading Rhythm** and **Books Finished**.
 
-Everything else is stock CrossInk: the same fonts, themes, reader features, settings and data on the SD card. This fork only adds two pages to the end of Reading Stats, and keeps their data in two new files of its own. Your existing stats are never changed, so you can flash stock CrossInk back at any time.
+Everything else is stock CrossInk: the same fonts, themes, reader features, settings and data on the SD card. This fork adds two pages to the end of Reading Stats (keeping their data in two new files of its own), its own boot screen, and shows **CrossInk-Rhythm** with the version in Settings. Your existing stats are never changed, so you can flash stock CrossInk back at any time.
 
 <table>
   <tr>
@@ -35,7 +35,8 @@ How often and how much you read, at a glance:
 
 - **Totals**: books read, total time spent on finished books, and average time per book.
 - **Recently Finished**: each finished book with its title, start → finish date, author and time spent, grouped by month.
-- The list fills the screen. It only splits into pages (`1/2`) when the books don't fit, and you move through it with Up/Down or a vertical swipe.
+- The list is a scroll panel with a scroll bar: swipe up/down to scroll, or move the selection with Up/Down.
+- Tap a book (or select it and press Confirm) to open that book's own stats.
 - Books that dropped out of Recent Books are still found by scanning the book caches already on the SD card.
 
 <table>
@@ -49,11 +50,19 @@ How often and how much you read, at a glance:
       <em>→ Reading Rhythm</em>
     </td>
     <td align="center">
-      <img src="./docs/images/rhythm/books-finished-page-2.png" width="200" alt="Books Finished list, page 2" /><br/>
-      <em>→ Books Finished (page 2)</em>
+      <img src="./docs/images/rhythm/books-finished-scrolled.png" width="200" alt="Books Finished list scrolled with a book selected" /><br/>
+      <em>→ Books Finished (scrolled, selected)</em>
     </td>
   </tr>
 </table>
+
+### Boot screen and version
+
+<img src="./docs/images/rhythm/boot-screen.png" width="160" align="right" alt="CrossInk-Rhythm boot screen" />
+
+The default boot screen is replaced by the CrossInk-Rhythm image above (`src/images/boot-rhythm.bmp`, run-length encoded by `scripts/bmp_to_boot_header.py` to about 22 KB of flash). CrossInk's custom boot screen setting still takes priority when it's on. Settings › System shows the firmware as **CrossInk-Rhythm v&lt;version&gt;**.
+
+<br clear="right"/>
 
 ### Where to find them
 

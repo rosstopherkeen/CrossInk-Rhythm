@@ -2,10 +2,13 @@
 
 #include <I18n.h>
 
+#include <algorithm>
+
 #include "BookStatsView.h"
 #include "MappedInputManager.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
+#include "rhythm/BookStatsScan.h"
 #include "rhythm/DailyMinutesBackfill.h"
 #include "rhythm/RhythmStatsView.h"
 #include "util/InputReleaseGuard.h"
@@ -309,20 +312,68 @@ void BookStatsActivity::showPage(const Page newPage) {
   }
   if (newPage == Page::FinishedBooks) {
     // Reloaded on every visit so completion edits made on this screen show up.
-    finishedBooks = FinishedBooksIndex::load(globalStats.completedBooks);
-    finishedPageStarts = RhythmStatsView::paginateFinishedBooks(renderer, &mappedInput, finishedBooks);
-    finishedListPage = 0;
+    reloadFinishedBooks();
+    finishedTop = 0;
+    finishedSelected = mappedInput.hasTouchHardware() || finishedBooks.empty() ? -1 : 0;
   }
   page = newPage;
   requestUpdate();
 }
 
-bool BookStatsActivity::showFinishedListPage(const int delta) {
-  const int target = static_cast<int>(finishedListPage) + delta;
-  if (target < 0 || target >= static_cast<int>(finishedPageStarts.size())) return false;
-  finishedListPage = static_cast<size_t>(target);
+void BookStatsActivity::reloadFinishedBooks() {
+  finishedBooks = FinishedBooksIndex::load(globalStats.completedBooks);
+  const size_t maxTop = RhythmStatsView::finishedMaxTop(renderer, &mappedInput, finishedBooks);
+  finishedTop = std::min(finishedTop, maxTop);
+  if (finishedSelected >= static_cast<int>(finishedBooks.size())) {
+    finishedSelected = static_cast<int>(finishedBooks.size()) - 1;
+  }
+}
+
+void BookStatsActivity::moveFinishedSelection(const int delta) {
+  if (finishedBooks.empty()) return;
+  const int last = static_cast<int>(finishedBooks.size()) - 1;
+  const int next = finishedSelected < 0 ? static_cast<int>(finishedTop) : std::clamp(finishedSelected + delta, 0, last);
+  finishedSelected = next;
+  // Keep the selection inside the scroll panel.
+  if (static_cast<size_t>(next) < finishedTop) finishedTop = static_cast<size_t>(next);
+  while (static_cast<size_t>(next) >=
+         finishedTop + RhythmStatsView::finishedVisibleCount(renderer, &mappedInput, finishedBooks, finishedTop)) {
+    ++finishedTop;
+  }
   requestUpdate();
-  return true;
+}
+
+void BookStatsActivity::scrollFinishedList(const int direction) {
+  if (finishedBooks.empty()) return;
+  const size_t visible = RhythmStatsView::finishedVisibleCount(renderer, &mappedInput, finishedBooks, finishedTop);
+  const size_t step = std::max<size_t>(1, visible > 1 ? visible - 1 : 1);
+  const size_t maxTop = RhythmStatsView::finishedMaxTop(renderer, &mappedInput, finishedBooks);
+  const size_t next =
+      direction > 0 ? std::min(maxTop, finishedTop + step) : (finishedTop > step ? finishedTop - step : 0);
+  if (next == finishedTop) return;
+  finishedTop = next;
+  if (finishedSelected >= 0) {
+    const size_t nowVisible = RhythmStatsView::finishedVisibleCount(renderer, &mappedInput, finishedBooks, finishedTop);
+    finishedSelected = static_cast<int>(
+        std::clamp<size_t>(static_cast<size_t>(finishedSelected), finishedTop, finishedTop + nowVisible - 1));
+  }
+  requestUpdate();
+}
+
+void BookStatsActivity::openFinishedBook(const size_t index) {
+  if (index >= finishedBooks.size()) return;
+  const FinishedBookEntry& entry = finishedBooks[index];
+  std::string cachePath;
+  if (!BookStatsScan::findCachePathForKey(entry.pathKey, cachePath)) return;
+  finishedSelected = static_cast<int>(index);
+  const BookReadingStats bookStats = BookReadingStats::load(cachePath);
+  startActivityForResult(std::make_unique<BookStatsActivity>(renderer, mappedInput, entry.title, cachePath, bookStats,
+                                                             -1.0f, false, 0, globalStats),
+                         [this](const ActivityResult&) {
+                           // Date or completion edits for that book may have changed the list.
+                           reloadFinishedBooks();
+                           requestUpdate();
+                         });
 }
 
 bool BookStatsActivity::showNextStatsPage() {
@@ -493,6 +544,15 @@ void BookStatsActivity::loop() {
       beginDateEditing();
       return;
     }
+    if (page == Page::FinishedBooks && !finishedBooks.empty()) {
+      // First press selects a row on touch devices; the next one opens it.
+      if (finishedSelected < 0) {
+        moveFinishedSelection(0);
+      } else {
+        openFinishedBook(static_cast<size_t>(finishedSelected));
+      }
+      return;
+    }
     exitStatsActivity();
     return;
   }
@@ -527,20 +587,34 @@ void BookStatsActivity::loop() {
   }
 
   if (page == Page::FinishedBooks) {
-    // The list pages first; past either end the stats pages take over.
+    int tappedTarget = -1;
+    if (mappedInput.wasItemTapped(tappedTarget) && tappedTarget >= RhythmStatsView::FINISHED_ROW_TOUCH_BASE) {
+      openFinishedBook(static_cast<size_t>(tappedTarget - RhythmStatsView::FINISHED_ROW_TOUCH_BASE));
+      return;
+    }
+    // Vertical swipes scroll the list panel; Up/Down move the selection.
     if (swipe == MappedInputManager::SwipeDir::Up) {
-      showFinishedListPage(1);
+      scrollFinishedList(1);
       return;
     }
     if (swipe == MappedInputManager::SwipeDir::Down) {
-      showFinishedListPage(-1);
+      scrollFinishedList(-1);
       return;
     }
-    if (upOrLeftPressed && showFinishedListPage(-1)) return;
-    if (downOrRightPressed) {
-      showFinishedListPage(1);
+    if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
+      moveFinishedSelection(1);
       return;
     }
+    if (mappedInput.wasPressed(MappedInputManager::Button::Up)) {
+      // Past the first book, Up returns to the previous stats page as before.
+      if (finishedSelected > 0) {
+        moveFinishedSelection(-1);
+        return;
+      }
+      showPreviousStatsPage();
+      return;
+    }
+    if (mappedInput.wasPressed(MappedInputManager::Button::Right)) return;
   }
 
   if (upOrLeftPressed) {
@@ -578,7 +652,7 @@ void BookStatsActivity::render(RenderLock&&) {
       break;
     case Page::FinishedBooks:
       RhythmStatsView::renderFinishedBooksPage(renderer, &mappedInput, finishedBooks, globalStats.completedBooks,
-                                               finishedPageStarts, finishedListPage);
+                                               finishedTop, finishedSelected);
       break;
     case Page::EditDates:
       renderEditBookDatesPage(renderer, &mappedInput, bookTitle, stats, selectedEditField, true);

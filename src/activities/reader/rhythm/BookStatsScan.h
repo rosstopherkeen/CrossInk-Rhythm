@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "activities/reader/BookReadingStats.h"
@@ -29,6 +30,10 @@ struct Book {
 using Visitor = void (*)(const Book& book, void* ctx);
 
 void forEach(Visitor visit, void* ctx);
+
+// Finds the /.crosspoint/<cache> directory whose FinishedBooksIndex key is
+// `key` (keys hash the cache path). Returns false when no directory matches.
+bool findCachePathForKey(uint64_t key, std::string& outCachePath);
 
 // Cache directory for an EPUB or XTC book path; empty for other formats.
 std::string cachePathForBookPath(const std::string& bookPath);

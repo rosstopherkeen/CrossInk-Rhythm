@@ -16,6 +16,7 @@
 #include "MappedInputManager.h"
 #include "activities/reader/BookStatsView.h"
 #include "activities/reader/ReadingStatsUtils.h"
+#include "components/TouchRegistry.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -107,12 +108,10 @@ void drawCenteredLabel(const GfxRenderer& renderer, const int fontId, const int 
 }
 
 // Same hint set as the built-in stats pages: Back exits, Left/Right page.
-void drawButtonHints(GfxRenderer& renderer, const MappedInputManager* mappedInput, const bool previousIsPage,
-                     const char* next) {
+void drawButtonHints(GfxRenderer& renderer, const MappedInputManager* mappedInput, const char* next) {
   if (!mappedInput) return;
-  const MappedInputManager::Label previous =
-      previousIsPage ? MappedInputManager::Label(tr(STR_RHYTHM_PREV_SHORT)) : mappedInput->withBackArrow(tr(STR_BACK));
-  const auto labels = mappedInput->mapLabels(mappedInput->withBackArrow(tr(STR_EXIT)), "", previous, next);
+  const auto labels = mappedInput->mapLabels(mappedInput->withBackArrow(tr(STR_EXIT)), "",
+                                             mappedInput->withBackArrow(tr(STR_BACK)), next);
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
 }
 
@@ -515,34 +514,35 @@ void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager* ma
     renderer.drawText(SMALL_FONT_ID, monthlyAverageX + monthlyAverageW + 4, monthlyFooterY, monthlyAverageValue);
   }
 
-  drawButtonHints(renderer, mappedInput, false, showMoreButton ? tr(STR_MORE) : "");
+  drawButtonHints(renderer, mappedInput, showMoreButton ? tr(STR_MORE) : "");
 }
 
-std::vector<uint16_t> paginateFinishedBooks(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
-                                            const std::vector<FinishedBookEntry>& finishedBooks) {
+size_t finishedVisibleCount(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                            const std::vector<FinishedBookEntry>& finishedBooks, const size_t top) {
   const FinishedListMetrics m = finishedListMetrics(renderer, mappedInput);
-  std::vector<uint16_t> starts;
-  starts.reserve(4);
-  starts.push_back(0);
   int y = m.listTop;
-  size_t pageStart = 0;
-  for (size_t i = 0; i < finishedBooks.size(); ++i) {
-    const bool header = startsMonthSection(finishedBooks, i, pageStart);
-    const int needed = (header ? m.headerRowH + (i > pageStart ? m.headerGap : 0) : 0) + m.bookRowH;
-    if (y + needed > m.listBottom && i > pageStart) {
-      pageStart = i;
-      starts.push_back(static_cast<uint16_t>(i));
-      y = m.listTop + m.headerRowH + m.bookRowH;  // a new page always opens with a month header
-      continue;
-    }
+  size_t visible = 0;
+  for (size_t i = top; i < finishedBooks.size(); ++i) {
+    const bool header = startsMonthSection(finishedBooks, i, top);
+    const int needed = (header ? m.headerRowH + (i > top ? m.headerGap : 0) : 0) + m.bookRowH;
+    if (y + needed > m.listBottom && visible > 0) break;
     y += needed;
+    ++visible;
   }
-  return starts;
+  return visible;
+}
+
+size_t finishedMaxTop(const GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                      const std::vector<FinishedBookEntry>& finishedBooks) {
+  for (size_t top = 0; top < finishedBooks.size(); ++top) {
+    if (top + finishedVisibleCount(renderer, mappedInput, finishedBooks, top) >= finishedBooks.size()) return top;
+  }
+  return 0;
 }
 
 void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
                              const std::vector<FinishedBookEntry>& finishedBooks, const uint32_t completedBooks,
-                             const std::vector<uint16_t>& pageStarts, const size_t listPage) {
+                             const size_t top, const int selected) {
   const FinishedListMetrics m = finishedListMetrics(renderer, mappedInput);
   const StatsPageFrame& frame = m.frame;
   drawStatsPageHeader(renderer, mappedInput, tr(STR_BOOKS_FINISHED));
@@ -565,33 +565,45 @@ void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* ma
   drawStatsValueCell(renderer, frame.cardX + thirdW * 2, frame.cardW - thirdW * 2, cellY, cellH,
                      finishedBooks.empty() ? "-" : buf, tr(STR_FINISHED_AVG_PER_BOOK));
 
-  // ---- Finished list card, filling the rest of the frame.
-  const size_t pageCount = std::max<size_t>(1, pageStarts.size());
-  const size_t page = std::min(listPage, pageCount - 1);
+  // ---- Finished list card: a vertical scroll panel filling the rest of the frame.
   const int listCardY = frame.top + m.summaryH + frame.cardGap;
   const int listCardH = frame.bottom - listCardY;
   drawStatsCardFrame(renderer, frame.cardX, listCardY, frame.cardW, listCardH, tr(STR_FINISHED_RECENT), frame.titleH);
   const int smallH = renderer.getLineHeight(SMALL_FONT_ID);
-  if (pageCount > 1) {
-    char pageLabel[12];
-    snprintf(pageLabel, sizeof(pageLabel), "%u/%u", static_cast<unsigned>(page + 1), static_cast<unsigned>(pageCount));
-    renderer.drawText(SMALL_FONT_ID,
-                      frame.cardX + frame.cardW - kCardPadding - renderer.getTextWidth(SMALL_FONT_ID, pageLabel),
-                      listCardY + (frame.titleH - smallH) / 2, pageLabel);
-  }
 
   if (finishedBooks.empty()) {
     drawCenteredLabel(renderer, UI_10_FONT_ID, frame.cardX, frame.cardW,
                       listCardY + frame.titleH + (listCardH - frame.titleH - renderer.getLineHeight(UI_10_FONT_ID)) / 2,
                       tr(STR_FINISHED_NONE));
   } else {
-    const size_t first = pageStarts.empty() ? 0 : pageStarts[page];
-    const size_t last = page + 1 < pageStarts.size() ? pageStarts[page + 1] : finishedBooks.size();
-    const int textX = frame.cardX + kCardPadding;
-    const int textW = frame.cardW - kCardPadding * 2;
+    const size_t first = std::min(top, finishedBooks.size() - 1);
+    const size_t visible = finishedVisibleCount(renderer, mappedInput, finishedBooks, first);
+    const bool scrolls = visible < finishedBooks.size();
+
+    // Scroll bar matching the FreeInkUI list indicator: theme width and side,
+    // light dithered track, solid thumb sized to the visible share.
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    const int scrollW = std::max(3, metrics.listScrollWidth);
+    const int scrollGutter = scrolls ? scrollW + 6 : 0;
+    const bool scrollLeft = metrics.listScrollSide == 1;
+    const int textX = frame.cardX + kCardPadding + (scrollLeft ? scrollGutter : 0);
+    const int textW = frame.cardW - kCardPadding * 2 - scrollGutter;
+    if (scrolls) {
+      const int trackX = scrollLeft ? frame.cardX + 4 : frame.cardX + frame.cardW - 4 - scrollW;
+      const int trackY = m.listTop;
+      const int trackH = std::max(1, m.listBottom - m.listTop);
+      renderer.fillRectDither(trackX, trackY, scrollW, trackH, Color::LightGray);
+      const size_t maxTop = std::max<size_t>(1, finishedMaxTop(renderer, mappedInput, finishedBooks));
+      const int thumbH =
+          std::max(12, static_cast<int>((static_cast<int64_t>(trackH) * visible) / finishedBooks.size()));
+      const int thumbY =
+          trackY + static_cast<int>((static_cast<int64_t>(trackH - thumbH) * std::min(first, maxTop)) / maxTop);
+      renderer.fillRect(trackX, thumbY, scrollW, thumbH);
+    }
+
     const int bodyH = renderer.getLineHeight(UI_10_FONT_ID);
     int y = m.listTop;
-    for (size_t i = first; i < last; ++i) {
+    for (size_t i = first; i < first + visible; ++i) {
       const FinishedBookEntry& entry = finishedBooks[i];
       if (startsMonthSection(finishedBooks, i, first)) {
         if (i > first) y += m.headerGap;
@@ -601,6 +613,13 @@ void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* ma
         renderer.drawText(SMALL_FONT_ID, textX, y + 3, headerText.c_str(), true, EpdFontFamily::BOLD);
         renderer.drawLine(textX, y + m.headerRowH - 3, textX + textW, y + m.headerRowH - 3);
         y += m.headerRowH;
+      }
+
+      // Each row opens that book's stats when tapped.
+      TouchRegistry::getInstance().add(Rect{textX - 4, y, textW + 8, m.bookRowH},
+                                       FINISHED_ROW_TOUCH_BASE + static_cast<int>(i), TouchRegistry::Item);
+      if (static_cast<int>(i) == selected) {
+        renderer.drawRoundedRect(textX - 6, y + 1, textW + 12, m.bookRowH - 2, 2, 6, true);
       }
 
       // Line 1: title, with the time spent right-aligned.
@@ -631,7 +650,12 @@ void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* ma
     }
   }
 
-  drawButtonHints(renderer, mappedInput, page > 0, page + 1 < pageCount ? tr(STR_RHYTHM_NEXT_SHORT) : "");
+  if (mappedInput) {
+    const auto labels =
+        mappedInput->mapLabels(mappedInput->withBackArrow(tr(STR_EXIT)), finishedBooks.empty() ? "" : tr(STR_SELECT),
+                               tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
+  }
 }
 
 }  // namespace RhythmStatsView
