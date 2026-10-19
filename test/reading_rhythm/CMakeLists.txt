@@ -5,6 +5,8 @@ add_executable(ReadingRhythmTest
   ${REPO_ROOT}/src/activities/reader/rhythm/DailyMinutesLog.cpp
   ${REPO_ROOT}/src/activities/reader/rhythm/DailyMinutesBackfill.cpp
   ${REPO_ROOT}/src/activities/reader/rhythm/FinishedBooksIndex.cpp
+  ${REPO_ROOT}/src/activities/reader/rhythm/BookDailyMinutes.cpp
+  ${REPO_ROOT}/src/activities/reader/rhythm/BookRhythm.cpp
 )
 
 # Stubs first so HalStorage/HalClock/CrossPointSettings resolve to host fakes.

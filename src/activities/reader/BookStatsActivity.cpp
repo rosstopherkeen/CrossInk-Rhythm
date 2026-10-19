@@ -8,6 +8,7 @@
 #include "MappedInputManager.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
+#include "rhythm/BookDailyMinutes.h"
 #include "rhythm/BookStatsScan.h"
 #include "rhythm/DailyMinutesBackfill.h"
 #include "rhythm/RhythmStatsView.h"
@@ -88,6 +89,7 @@ void BookStatsActivity::saveStats() {
   globalStats.save();
   // Books Finished sidecar; the reader refreshes the author when it next records.
   FinishedBooksIndex::record(bookCachePath, bookTitle, "", stats);
+  bookRhythmLoaded = false;  // start/finish dates may have moved the window
   refreshAllDevicesStats();
   didChangeStats = false;
 }
@@ -304,6 +306,13 @@ void BookStatsActivity::exitStatsActivity() {
 }
 
 void BookStatsActivity::showPage(const Page newPage) {
+  if (newPage == Page::BookRhythm && !bookRhythmLoaded) {
+    ReadingStatsDateTime now;
+    const uint32_t today = getCurrentLocalReadingStatsDateTime(now) ? readingStatsDayIndex(now.date) : 0;
+    BookRhythm::build(stats, today, globalStats.readingHistoryAnchorDay, globalStats.readingHistoryBits,
+                      BookDailyMinutes::load(bookCachePath), bookRhythm);
+    bookRhythmLoaded = true;
+  }
   if (newPage == Page::ReadingRhythm && !rhythmLoaded) {
     // One-time minutes backfill runs here; read days come from this screen's stats.
     rhythmMinutes =
@@ -367,16 +376,22 @@ void BookStatsActivity::openFinishedBook(const size_t index) {
   if (!BookStatsScan::findCachePathForKey(entry.pathKey, cachePath)) return;
   finishedSelected = static_cast<int>(index);
   const BookReadingStats bookStats = BookReadingStats::load(cachePath);
-  startActivityForResult(std::make_unique<BookStatsActivity>(renderer, mappedInput, entry.title, cachePath, bookStats,
-                                                             -1.0f, false, 0, globalStats),
-                         [this](const ActivityResult&) {
-                           // Date or completion edits for that book may have changed the list.
-                           reloadFinishedBooks();
-                           requestUpdate();
-                         });
+  auto detail = std::make_unique<BookStatsActivity>(renderer, mappedInput, entry.title, cachePath, bookStats,
+                                                    bookStats.isCompleted ? 100.0f : -1.0f, false, 0, globalStats);
+  detail->enableBookDetailMode();
+  startActivityForResult(std::move(detail), [this](const ActivityResult&) {
+    // Date or completion edits for that book may have changed the list.
+    reloadFinishedBooks();
+    requestUpdate();
+  });
 }
 
 bool BookStatsActivity::showNextStatsPage() {
+  if (bookDetailMode) {
+    if (page != Page::PerBook) return false;
+    showPage(Page::BookRhythm);
+    return true;
+  }
   switch (page) {
     case Page::PerBook:
       showPage(Page::ThisDevice);
@@ -392,12 +407,18 @@ bool BookStatsActivity::showNextStatsPage() {
       return true;
     case Page::FinishedBooks:
     case Page::EditDates:
+    case Page::BookRhythm:
       return false;
   }
   return false;
 }
 
 bool BookStatsActivity::showPreviousStatsPage() {
+  if (bookDetailMode) {
+    if (page != Page::BookRhythm) return false;
+    showPage(Page::PerBook);
+    return true;
+  }
   switch (page) {
     case Page::FinishedBooks:
       showPage(Page::ReadingRhythm);
@@ -413,16 +434,19 @@ bool BookStatsActivity::showPreviousStatsPage() {
       return true;
     case Page::PerBook:
     case Page::EditDates:
+    case Page::BookRhythm:
       return false;
   }
   return false;
 }
 
-int BookStatsActivity::pageIndicatorCount() const { return (showAllDevicesStats ? 3 : 2) + 2; }
+int BookStatsActivity::pageIndicatorCount() const { return bookDetailMode ? 2 : (showAllDevicesStats ? 3 : 2) + 2; }
 
 int BookStatsActivity::pageIndicatorIndex() const {
   const int devicePages = showAllDevicesStats ? 3 : 2;
   switch (page) {
+    case Page::BookRhythm:
+      return 1;
     case Page::ReadingRhythm:
       return devicePages;
     case Page::FinishedBooks:
@@ -649,6 +673,9 @@ void BookStatsActivity::render(RenderLock&&) {
       break;
     case Page::ReadingRhythm:
       RhythmStatsView::renderReadingRhythmPage(renderer, &mappedInput, globalStats, rhythmMinutes, true);
+      break;
+    case Page::BookRhythm:
+      RhythmStatsView::renderBookRhythmPage(renderer, &mappedInput, bookTitle, bookRhythm);
       break;
     case Page::FinishedBooks:
       RhythmStatsView::renderFinishedBooksPage(renderer, &mappedInput, finishedBooks, globalStats.completedBooks,

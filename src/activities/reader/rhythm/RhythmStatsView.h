@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
+#include "BookRhythm.h"
 #include "DailyMinutesLog.h"
 #include "FinishedBooksIndex.h"
 #include "activities/reader/GlobalReadingStats.h"
@@ -43,5 +45,10 @@ size_t finishedMaxTop(const GfxRenderer& renderer, const MappedInputManager* map
 void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
                              const std::vector<FinishedBookEntry>& finishedBooks, uint32_t completedBooks, size_t top,
                              int selected);
+
+// Book detail page: reading days over the book's start-to-finish span, weekly
+// time within it, and a summary (days read, average per day, longest streak).
+void renderBookRhythmPage(GfxRenderer& renderer, const MappedInputManager* mappedInput, const std::string& bookTitle,
+                          const BookRhythm& rhythm);
 
 }  // namespace RhythmStatsView

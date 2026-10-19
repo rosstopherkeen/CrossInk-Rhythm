@@ -1528,7 +1528,7 @@ void EpubReaderActivity::commitReadingStatsSession() {
   if (!statsTrackingActive) return;
   recordCurrentPageReadingTime("session_commit");
   commitReadingSession(stats, globalStats, sessionReadingSeconds,
-                       hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr);
+                       hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr, &epub->getCachePath());
   sessionReadingSeconds = 0;
 }
 

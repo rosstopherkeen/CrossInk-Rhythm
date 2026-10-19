@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "activities/reader/ReadingStatsUtils.h"
+#include "activities/reader/rhythm/BookDailyMinutes.h"
+#include "activities/reader/rhythm/BookRhythm.h"
 #include "activities/reader/rhythm/DailyMinutesBackfill.h"
 #include "activities/reader/rhythm/DailyMinutesLog.h"
 #include "activities/reader/rhythm/FinishedBooksIndex.h"
@@ -467,6 +469,146 @@ TEST_F(RhythmTest, SidecarsNeverTouchGlobalStats) {
   EXPECT_EQ(Storage.bytes(GLOBAL_PATH), global);
   EXPECT_FALSE(Storage.exists("/.crosspoint/global_stats.bin.bak"));
   EXPECT_FALSE(Storage.exists("/.crosspoint/global_stats.bin.tmp"));
+}
+
+// ---------------------------------------------------------------- per-book minutes
+
+TEST_F(RhythmTest, BookMinutesWireLayoutAndRoundTrip) {
+  const std::string cache = "/.crosspoint/epub_7";
+  BookDailyMinutes book;
+  book.recordSpan(at(2026, 10, 15, 23, 50), 20 * 60);  // 10 + 10 across midnight
+  ASSERT_EQ(book.days.size(), 2u);
+  ASSERT_TRUE(book.save(cache));
+
+  const std::vector<uint8_t> b = Storage.bytes(cache + "/rhythm_days.bin");
+  ASSERT_EQ(b.size(), 8u + 2u * 6u);
+  EXPECT_EQ(std::string(b.begin(), b.begin() + 4), "CIBR");
+  EXPECT_EQ(b[4], 1);
+  EXPECT_EQ(le16(b, 6), 2);
+  EXPECT_EQ(le32(b, 8), day(2026, 10, 15));
+  EXPECT_EQ(le16(b, 12), 10);
+  EXPECT_EQ(le32(b, 14), day(2026, 10, 16));
+  EXPECT_EQ(le16(b, 18), 10);
+
+  const BookDailyMinutes loaded = BookDailyMinutes::load(cache);
+  EXPECT_EQ(loaded.minutesOn(day(2026, 10, 15)), 10);
+  EXPECT_EQ(loaded.minutesOn(day(2026, 10, 16)), 10);
+  EXPECT_EQ(loaded.minutesOn(day(2026, 10, 17)), 0);
+}
+
+TEST_F(RhythmTest, BookMinutesCapDropsOldestAndClamps) {
+  BookDailyMinutes book;
+  for (uint32_t i = 0; i < BookDailyMinutes::MAX_DAYS + 5; ++i) {
+    ReadingStatsDate date{2025, 1, 1};
+    addDaysToReadingStatsDate(date, static_cast<int>(i));
+    ReadingStatsDateTime dt;
+    dt.date = date;
+    dt.hour = 9;
+    book.recordSpan(dt, 120);
+  }
+  EXPECT_EQ(book.days.size(), BookDailyMinutes::MAX_DAYS);
+  EXPECT_EQ(book.minutesOn(day(2025, 1, 1)), 0);  // oldest dropped
+  for (int i = 0; i < 30; ++i) book.recordSpan(at(2026, 10, 16, 0, 0), 23 * 3600);
+  EXPECT_EQ(book.minutesOn(day(2026, 10, 16)), 1440);
+}
+
+TEST_F(RhythmTest, BookMinutesBackupAndForwardGuard) {
+  const std::string cache = "/.crosspoint/epub_8";
+  const std::string path = cache + "/rhythm_days.bin";
+  BookDailyMinutes::recordSpanAndSave(cache, at(2026, 10, 16, 9, 0), 600);
+  BookDailyMinutes::recordSpanAndSave(cache, at(2026, 10, 16, 10, 0), 600);
+  Storage.put(path, {'C', 'I', 'B'});
+  EXPECT_EQ(BookDailyMinutes::load(cache).minutesOn(day(2026, 10, 16)), 10);  // from .bak
+
+  std::vector<uint8_t> future = {'C', 'I', 'B', 'R', 2, 0, 0, 0};
+  Storage.put(path, future);
+  BookDailyMinutes::recordSpanAndSave(cache, at(2026, 10, 17, 9, 0), 600);
+  EXPECT_EQ(Storage.bytes(path), future);
+}
+
+// ---------------------------------------------------------------- per-book rhythm
+
+BookReadingStats bookStats(const ReadingStatsDate start, const ReadingStatsDate finish, const uint32_t seconds,
+                           const uint16_t sessions, const bool completed = true) {
+  BookReadingStats stats;
+  stats.startDate = start;
+  stats.finishedDate = finish;
+  stats.totalReadingSeconds = seconds;
+  stats.sessionCount = sessions;
+  stats.isCompleted = completed;
+  return stats;
+}
+
+TEST_F(RhythmTest, FinishedBookEstimatesOnlyGlobalReadDaysInWindow) {
+  History history;
+  // Read days: Oct 1, 3, 5, 7 plus Sep 20 (before the book) and Oct 12 (after).
+  for (const uint32_t d :
+       {day(2026, 9, 20), day(2026, 10, 1), day(2026, 10, 3), day(2026, 10, 5), day(2026, 10, 7), day(2026, 10, 12)}) {
+    history.mark(d);
+  }
+  BookRhythm rhythm;
+  ASSERT_TRUE(BookRhythm::build(bookStats({2026, 10, 1}, {2026, 10, 7}, 40 * 60, 2), day(2026, 10, 16), history.anchor,
+                                history.bits, BookDailyMinutes{}, rhythm));
+  // k = min(2 sessions, 4 read days) = 2, evenly spaced: Oct 1 and Oct 5, 20 min each.
+  EXPECT_EQ(rhythm.daysRead, 2);
+  EXPECT_EQ(rhythm.totalMinutes, 40u);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 1)).minutes, 20);
+  EXPECT_TRUE(rhythm.dayAt(day(2026, 10, 1)).estimated);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 5)).minutes, 20);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 3)).minutes, 0);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 9, 20)).minutes, 0);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 12)).minutes, 0);
+  EXPECT_EQ(rhythm.spanDays, 7);
+  EXPECT_EQ(rhythm.weekCount, 2);  // Mon Sep 28 and Mon Oct 5 weeks
+  EXPECT_FALSE(rhythm.truncated);
+  EXPECT_TRUE(rhythm.anyEstimated);
+}
+
+TEST_F(RhythmTest, OngoingBookWindowEndsTodayAndRealOverridesEstimates) {
+  History history;
+  for (const uint32_t d : {day(2026, 10, 10), day(2026, 10, 11), day(2026, 10, 14), day(2026, 10, 15)}) {
+    history.mark(d);
+  }
+  BookDailyMinutes real;
+  real.recordSpan(at(2026, 10, 14, 20, 0), 30 * 60);
+  real.recordSpan(at(2026, 10, 15, 20, 0), 15 * 60);
+  real.days.insert(real.days.begin(), BookDailyMinutes::Day{day(2026, 9, 1), 99});  // outside the window
+
+  BookRhythm rhythm;
+  ASSERT_TRUE(BookRhythm::build(bookStats({2026, 10, 10}, {}, (30 + 15 + 60) * 60, 6, false), day(2026, 10, 16),
+                                history.anchor, history.bits, real, rhythm));
+  EXPECT_EQ(rhythm.endDay, day(2026, 10, 16));
+  // Real days use real minutes.
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 14)).minutes, 30);
+  EXPECT_FALSE(rhythm.dayAt(day(2026, 10, 14)).estimated);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 15)).minutes, 15);
+  // Remaining 60 min spread over the 2 read days before the first real day.
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 10)).minutes, 30);
+  EXPECT_TRUE(rhythm.dayAt(day(2026, 10, 10)).estimated);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 10, 11)).minutes, 30);
+  EXPECT_EQ(rhythm.dayAt(day(2026, 9, 1)).minutes, 0);
+  EXPECT_EQ(rhythm.totalMinutes, 105u);
+  EXPECT_EQ(rhythm.daysRead, 4);
+  EXPECT_EQ(rhythm.longestStreak, 2);
+}
+
+TEST_F(RhythmTest, LongBookShowsLastThirteenWeeks) {
+  History history;
+  for (uint32_t d = day(2026, 3, 1); d <= day(2026, 10, 1); d += 3) history.mark(d);
+  BookRhythm rhythm;
+  ASSERT_TRUE(BookRhythm::build(bookStats({2026, 3, 1}, {2026, 10, 1}, 3600 * 40, 80), day(2026, 10, 16),
+                                history.anchor, history.bits, BookDailyMinutes{}, rhythm));
+  EXPECT_TRUE(rhythm.truncated);
+  EXPECT_EQ(rhythm.weekCount, BookRhythm::MAX_WEEKS);
+  EXPECT_GT(rhythm.daysRead, 40);                       // summary covers the whole window, not just the shown weeks
+  EXPECT_EQ(rhythm.dayAt(day(2026, 3, 1)).minutes, 0);  // before the shown weeks
+}
+
+TEST_F(RhythmTest, BookWithoutStartDateHasNoRhythm) {
+  BookRhythm rhythm;
+  EXPECT_FALSE(
+      BookRhythm::build(bookStats({}, {2026, 10, 1}, 3600, 2), day(2026, 10, 16), 0, {}, BookDailyMinutes{}, rhythm));
+  EXPECT_FALSE(rhythm.valid());
 }
 
 }  // namespace

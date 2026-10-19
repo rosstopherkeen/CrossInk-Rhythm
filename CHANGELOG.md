@@ -4,6 +4,7 @@
 
 - Reading Rhythm page in Reading Stats: recent activity dot grid, weekly reading time bars, and reading days per month for the last 12 months. Ported from XPoint.
 - Books Finished page in Reading Stats: totals plus a scrollable list (with scroll bar) of finished books with start and finish dates and time spent. Tap a book, or select it and press Confirm, to open its stats. Ported from XPoint. Finished books that dropped out of Recent Books are found by scanning existing book caches.
+- Book detail view from Books Finished: an Overview page (that book's stats, time of day and day of week) and a Book Rhythm page (reading days across the book's span, daily or weekly reading time, days read, average per day, longest streak). Per-book daily minutes are now recorded; earlier days are estimated and shown lighter.
 - New CrossInk-Rhythm boot screen.
 - Daily reading minutes are now recorded for the Reading Rhythm screen. Minutes for days read before updating are estimated once from each book's reading time and shown lighter.
 
