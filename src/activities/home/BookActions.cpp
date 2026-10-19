@@ -130,13 +130,13 @@ std::unique_ptr<Activity> createReadingStatsActivity(GfxRenderer& renderer, Mapp
   const float progress = FsHelpers::hasEpubExtension(fullPath) ? RecentBookProgress::loadCachedEpubPercent(book)
                                                                : RecentBookProgress::loadPercent(book);
   const BookReadingStats stats = BookReadingStats::load(cachePath);
-  const GlobalReadingStats global = GlobalReadingStats::load();
-  if (GlobalReadingStats::hasSyncedStats()) {
-    return makeUniqueNoThrow<BookStatsActivity>(renderer, mappedInput, title, cachePath, stats, progress, false, 0,
-                                                global, GlobalReadingStats::loadAggregated(global));
-  }
-  return makeUniqueNoThrow<BookStatsActivity>(renderer, mappedInput, title, cachePath, stats, progress, false, 0,
-                                              global);
+  // Book-only view (Overview + Book Rhythm), same as opening a book from
+  // Books Finished; the device-wide pages stay on the main Reading Stats screen.
+  auto activity =
+      makeUniqueNoThrow<BookStatsActivity>(renderer, mappedInput, title, cachePath, stats,
+                                           stats.isCompleted ? 100.0f : progress, false, 0, GlobalReadingStats::load());
+  if (activity) activity->enableBookDetailMode();
+  return activity;
 }
 
 bool resetBookReaderSettings(const std::string& fullPath) {
