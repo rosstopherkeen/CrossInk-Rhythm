@@ -8,11 +8,12 @@
 #include "../Activity.h"
 #include "BookReadingStats.h"
 #include "GlobalReadingStats.h"
+#include "rhythm/BookRhythm.h"
 #include "rhythm/DailyMinutesLog.h"
 #include "rhythm/FinishedBooksIndex.h"
 
 class BookStatsActivity final : public Activity {
-  enum class Page : uint8_t { PerBook, ThisDevice, AllDevices, EditDates, ReadingRhythm, FinishedBooks };
+  enum class Page : uint8_t { PerBook, ThisDevice, AllDevices, EditDates, ReadingRhythm, FinishedBooks, BookRhythm };
 
   std::string bookTitle;
   std::string bookCachePath;
@@ -38,6 +39,10 @@ class BookStatsActivity final : public Activity {
   // Reading Rhythm / Books Finished pages, loaded when first shown.
   DailyMinutesLog rhythmMinutes;
   bool rhythmLoaded = false;
+  // Book detail mode (opened from Books Finished): Overview + Book Rhythm only.
+  bool bookDetailMode = false;
+  BookRhythm bookRhythm;
+  bool bookRhythmLoaded = false;
   std::vector<FinishedBookEntry> finishedBooks;
   size_t finishedTop = 0;     // first book shown in the scroll panel
   int finishedSelected = -1;  // outlined row; -1 until a button selects one
@@ -76,6 +81,9 @@ class BookStatsActivity final : public Activity {
                     const std::string& bookCachePath, const BookReadingStats& stats, float progressPercent,
                     bool hasEstimatedTimeLeft, uint32_t estimatedTimeLeftSeconds, const GlobalReadingStats& globalStats,
                     const GlobalReadingStats& allDevicesStats, bool returnToHomeOnExit = false);
+
+  // Restricts this screen to the book's own pages: Overview and Book Rhythm.
+  void enableBookDetailMode() { bookDetailMode = true; }
 
   void onEnter() override;
   void onExit() override;

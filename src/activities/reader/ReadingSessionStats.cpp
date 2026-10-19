@@ -1,9 +1,10 @@
 #include "ReadingSessionStats.h"
 
+#include "rhythm/BookDailyMinutes.h"
 #include "rhythm/DailyMinutesLog.h"
 
 void commitReadingSession(BookReadingStats& book, GlobalReadingStats& global, const uint32_t seconds,
-                          const ReadingStatsDateTime* sessionStart) {
+                          const ReadingStatsDateTime* sessionStart, const std::string* bookCachePath) {
   // Page intervals longer than the idle threshold are rejected before they
   // reach the session total, so seconds is active reading time.
   if (seconds >= 60) {
@@ -18,6 +19,7 @@ void commitReadingSession(BookReadingStats& book, GlobalReadingStats& global, co
   global.recordReadingSpan(*sessionStart, seconds);
   // Reading Rhythm sidecar (daily_minutes.bin); global_stats.bin is unchanged.
   DailyMinutesLog::recordSpanAndSave(*sessionStart, seconds);
+  if (bookCachePath) BookDailyMinutes::recordSpanAndSave(*bookCachePath, *sessionStart, seconds);
   if (seconds >= 120 && !book.startDateManual && !book.startDate.isValid()) {
     book.startDate = sessionStart->date;
   }

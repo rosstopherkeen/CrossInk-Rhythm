@@ -33,6 +33,15 @@ namespace DailyMinutesBackfill {
 // Minutes per chosen day: round(totalSeconds / 60 / k), at least 1.
 uint32_t minutesPerDay(uint32_t totalSeconds, uint32_t dayCount);
 
+// Spreads totalSeconds evenly over k = min(sessionCount, readDays) of the real
+// read days in [firstDay, lastDay], calling emit(day, minutes, ctx) for each
+// chosen day. Returns k (0 when nothing was spread). Shared by the global
+// backfill and the per-book rhythm page.
+using SpreadCallback = void (*)(uint32_t day, uint32_t minutes, void* ctx);
+uint32_t spreadEvenly(uint32_t historyAnchorDay, const std::array<uint8_t, READING_HISTORY_BYTES>& historyBits,
+                      uint32_t firstDay, uint32_t lastDay, uint16_t sessionCount, uint32_t totalSeconds,
+                      SpreadCallback emit, void* ctx);
+
 // Pure computation: fills log.estimatedMinutes and sets the backfill flag.
 // The caller must already have advanced log to today.
 void apply(uint32_t historyAnchorDay, const std::array<uint8_t, READING_HISTORY_BYTES>& historyBits, uint32_t cutoffDay,

@@ -771,7 +771,7 @@ void XtcReaderActivity::commitReadingStats() {
   if (statsTrackingActive) {
     recordCurrentPageReadingTime("session_commit");
     commitReadingSession(stats, globalStats, sessionReadingSeconds,
-                         hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr);
+                         hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr, &xtc->getCachePath());
   }
   sessionReadingSeconds = 0;
   if ((statsTrackingActive || paceDirty || pendingStatsCommit) && stats.save(xtc->getCachePath())) {

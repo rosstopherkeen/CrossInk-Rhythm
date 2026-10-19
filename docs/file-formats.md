@@ -609,6 +609,29 @@ Binary layout (little-endian):
   - `uint16_t` title length + UTF-8 bytes (at most 160)
   - `uint16_t` author length + UTF-8 bytes (at most 120; absent before v3)
 
+## `epub_<hash>/rhythm_days.bin` (also `xtc_<hash>/`)
+
+### Version 1
+
+Per-book sidecar for the Book Rhythm page (book detail view opened from Books
+Finished). It stores real reading minutes per day for that book, recorded when
+a reading session is committed. `stats_v5.bin` is never changed. Days before
+the first entry are estimated on screen from the global read days between the
+book's start and finish dates; entries outside that window are ignored, so
+deleting a book's stats hides old entries.
+
+Same atomic write and `.bak` fallback as `daily_minutes.bin`; a newer version
+is never overwritten.
+
+Binary layout (little-endian):
+
+- `[0-3]` magic `CIBR`
+- `[4]` version (`1`)
+- `[5]` flags (reserved, `0`)
+- `[6-7]` entry count (`uint16_t`, at most 400; oldest days are dropped)
+- per entry, strictly ascending by day: `uint32_t` day index (days since
+  2000-01-01), `uint16_t` minutes (clamped to 1440)
+
 ## `section.bin`
 
 ### Version 83

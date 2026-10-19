@@ -658,4 +658,224 @@ void renderFinishedBooksPage(GfxRenderer& renderer, const MappedInputManager* ma
   }
 }
 
+void renderBookRhythmPage(GfxRenderer& renderer, const MappedInputManager* mappedInput, const std::string& bookTitle,
+                          const BookRhythm& rhythm) {
+  const bool compactWidth = renderer.getScreenWidth() < 500;
+  const int smallH = renderer.getLineHeight(SMALL_FONT_ID);
+  const int valueH = renderer.getLineHeight(UI_12_FONT_ID);
+  const int monthLabelH = smallH + 6;
+  const int minRowStride = compactWidth ? 22 : 26;
+  const int maxRowStride = compactWidth ? 40 : 46;
+  const int summaryCellH = valueH + smallH + 22;
+  const auto daysMinH = [&](const int titleH) { return titleH + monthLabelH + 7 * minRowStride + kCardPadding; };
+  const auto weeklyMinH = [&](const int titleH) { return titleH + 70 + smallH + 8; };
+  const StatsPageFrame frame =
+      statsPageFrame(renderer, mappedInput, true, daysMinH(30) + weeklyMinH(30) + 30 + summaryCellH, 3);
+  drawStatsPageHeader(renderer, mappedInput, tr(STR_BOOK_RHYTHM));
+
+  const int titleH = frame.titleH;
+  const int cardX = frame.cardX;
+  const int cardW = frame.cardW;
+  const int summaryH = titleH + summaryCellH;
+
+  if (!rhythm.valid()) {
+    drawStatsCardFrame(
+        renderer, cardX, frame.top, cardW, frame.bottom - frame.top,
+        renderer.truncatedText(UI_10_FONT_ID, bookTitle.c_str(), cardW - 20, EpdFontFamily::BOLD).c_str(), titleH);
+    drawCenteredLabel(renderer, UI_10_FONT_ID, cardX, cardW, (frame.top + frame.bottom) / 2, tr(STR_BOOK_NO_RHYTHM));
+    drawButtonHints(renderer, mappedInput, "");
+    return;
+  }
+
+  // Fill the frame: grow the day rows first, the weekly chart takes the rest.
+  const int availableH = frame.bottom - frame.top;
+  int extraH = std::max(0, availableH - daysMinH(titleH) - weeklyMinH(titleH) - summaryH - frame.cardGap * 2);
+  const int rowExtra = std::min(maxRowStride - minRowStride, (extraH * 2 / 3) / 7);
+  extraH -= rowExtra * 7;
+  const int rowStride = minRowStride + rowExtra;
+  const int daysCardH = daysMinH(titleH) + rowExtra * 7;
+  const int weeklyCardH = weeklyMinH(titleH) + extraH;
+
+  // ---- Reading Days card: Mon-Sun rows x the book's weeks.
+  const int daysY = frame.top;
+  const char* note = rhythm.anyEstimated ? tr(STR_RHYTHM_ESTIMATED_NOTE) : "";
+  const int noteW = rhythm.anyEstimated ? renderer.getTextWidth(SMALL_FONT_ID, note) + kCardPadding : 0;
+  const std::string cardTitle =
+      renderer.truncatedText(UI_10_FONT_ID, bookTitle.c_str(), cardW - 2 * (noteW + kCardPadding), EpdFontFamily::BOLD);
+  drawStatsCardFrame(renderer, cardX, daysY, cardW, daysCardH, cardTitle.c_str(), titleH);
+  if (rhythm.anyEstimated) {
+    renderer.drawText(SMALL_FONT_ID, cardX + cardW - kCardPadding - renderer.getTextWidth(SMALL_FONT_ID, note),
+                      daysY + (titleH - smallH) / 2, note);
+  }
+
+  const int weekdayLabelW = compactWidth ? 38 : 46;
+  const int gridAreaX = cardX + kCardPadding + weekdayLabelW;
+  const int gridAreaW = cardW - kCardPadding * 2 - weekdayLabelW;
+  const int columnStride = std::max(1, gridAreaW / BookRhythm::MAX_WEEKS);
+  // Short spans are centered in the grid area.
+  const int gridX = gridAreaX + (gridAreaW - columnStride * rhythm.weekCount) / 2;
+  const int gridTop = daysY + titleH + monthLabelH;
+  const int activeDotSize = std::clamp(rowStride - 10, 12, 18);
+  const int inactiveDotSize = compactWidth ? 5 : 6;
+
+  uint8_t previousMonth = 0;
+  for (int week = 0; week < rhythm.weekCount; ++week) {
+    ReadingStatsDate weekDate;
+    const uint32_t weekStart = std::max(rhythm.firstShownDay + static_cast<uint32_t>(week) * 7u, rhythm.startDay);
+    if (readingStatsDateFromDayIndex(weekStart, weekDate) && weekDate.month != previousMonth) {
+      char monthToken[8];
+      formatReadingStatsMonthToken(weekDate, monthToken, sizeof(monthToken));
+      renderer.drawText(SMALL_FONT_ID, gridX + week * columnStride, daysY + titleH + 3, monthToken);
+      previousMonth = weekDate.month;
+    }
+  }
+
+  for (int weekday = 0; weekday < 7; ++weekday) {
+    const int rowCenterY = gridTop + weekday * rowStride + rowStride / 2;
+    renderer.drawText(SMALL_FONT_ID, cardX + kCardPadding, rowCenterY - smallH / 2,
+                      I18n::getInstance().get(DAY_LABELS[weekday]));
+    for (int week = 0; week < rhythm.weekCount; ++week) {
+      const uint32_t dayIndex =
+          rhythm.firstShownDay + static_cast<uint32_t>(week) * 7u + static_cast<uint32_t>(weekday);
+      if (dayIndex < rhythm.startDay || dayIndex > rhythm.endDay) continue;  // outside the book's span
+      const int centerX = gridX + week * columnStride + columnStride / 2;
+      const BookRhythm::Day day = rhythm.dayAt(dayIndex);
+      int dotSize = inactiveDotSize;
+      Color dotColor = Color::LightGray;
+      readingIntensityStyle(day.minutes, activeDotSize, inactiveDotSize, dotSize, dotColor);
+      if (day.estimated) {
+        renderer.drawRoundedRect(centerX - dotSize / 2, rowCenterY - dotSize / 2, dotSize, dotSize, 1, dotSize / 2,
+                                 true);
+      } else {
+        renderer.fillRoundedRect(centerX - dotSize / 2, rowCenterY - dotSize / 2, dotSize, dotSize, dotSize / 2,
+                                 dotColor);
+      }
+      if (dayIndex == rhythm.startDay || dayIndex == rhythm.endDay) {
+        const int ringSize = activeDotSize + 6;
+        renderer.drawRoundedRect(centerX - ringSize / 2, rowCenterY - ringSize / 2, ringSize, ringSize, 2, ringSize / 2,
+                                 true);
+      }
+    }
+  }
+
+  // ---- Reading time card: per day for short books (up to 3 weeks), else per week.
+  const bool dailyBars = rhythm.spanDays <= 21;
+  const int barCount = dailyBars ? static_cast<int>(rhythm.spanDays) : rhythm.weekCount;
+  std::array<uint32_t, 21> barMinutes{};
+  std::array<uint32_t, 21> barEstimated{};
+  for (int bar = 0; bar < barCount; ++bar) {
+    const int daysInBar = dailyBars ? 1 : 7;
+    const uint32_t firstDay = dailyBars ? rhythm.startDay + static_cast<uint32_t>(bar)
+                                        : rhythm.firstShownDay + static_cast<uint32_t>(bar) * 7u;
+    for (int i = 0; i < daysInBar; ++i) {
+      const BookRhythm::Day day = rhythm.dayAt(firstDay + static_cast<uint32_t>(i));
+      barMinutes[static_cast<size_t>(bar)] += day.minutes;
+      if (day.estimated) barEstimated[static_cast<size_t>(bar)] += day.minutes;
+    }
+  }
+  uint32_t shownMinutes = 0;
+  for (int bar = 0; bar < barCount; ++bar) shownMinutes += barMinutes[static_cast<size_t>(bar)];
+  const uint32_t maxBar = *std::max_element(barMinutes.begin(), barMinutes.begin() + barCount);
+  const uint16_t scaleMinutes = weeklyChartScaleMinutes(maxBar);
+  const uint32_t averageBar = shownMinutes / static_cast<uint32_t>(std::max(1, barCount));
+
+  const int weeklyY = daysY + daysCardH + frame.cardGap;
+  drawStatsCardFrame(renderer, cardX, weeklyY, cardW, weeklyCardH,
+                     dailyBars ? tr(STR_BOOK_DAILY_TIME) : tr(STR_RHYTHM_WEEKLY_TIME), titleH);
+  if (rhythm.truncated) {
+    const char* lastWeeks = tr(STR_BOOK_LAST_WEEKS);
+    renderer.drawText(SMALL_FONT_ID, cardX + cardW - kCardPadding - renderer.getTextWidth(SMALL_FONT_ID, lastWeeks),
+                      weeklyY + (titleH - smallH) / 2, lastWeeks);
+  }
+  const int footerH = smallH + 6;
+  const int dayLabelH = dailyBars ? smallH + 2 : 0;
+  const int chartTop = weeklyY + titleH + 8;
+  const int chartBottom = weeklyY + weeklyCardH - footerH - 4 - dayLabelH;
+  const int chartHeight = std::max(1, chartBottom - chartTop);
+  const int barAreaX = gridAreaX;
+  const int barStride = dailyBars ? std::max(1, gridAreaW / std::max(7, barCount)) : columnStride;
+  const int barsX = dailyBars ? barAreaX + (gridAreaW - barStride * barCount) / 2 : gridX;
+  const int chartRight = barsX + barStride * barCount;
+  char label[24];
+  formatRhythmMinutes(scaleMinutes, label, sizeof(label));
+  renderer.drawText(SMALL_FONT_ID, cardX + kCardPadding, chartTop, label);
+  renderer.drawLine(barsX, chartBottom, chartRight, chartBottom);
+  if (averageBar > 0) {
+    const int averageY =
+        chartBottom - static_cast<int>((static_cast<uint64_t>(chartHeight) * averageBar) / scaleMinutes);
+    for (int dashX = barsX; dashX < chartRight; dashX += 8) {
+      renderer.drawLine(dashX, averageY, std::min(dashX + 3, chartRight), averageY);
+    }
+  }
+  const int barWidth = std::min(barStride - 4, compactWidth ? 14 : 18);
+  for (int bar = 0; bar < barCount; ++bar) {
+    const int barX = barsX + bar * barStride + barStride / 2 - barWidth / 2;
+    if (dailyBars) {
+      // Weekday initial under each day bar.
+      ReadingStatsDate date;
+      if (readingStatsDateFromDayIndex(rhythm.startDay + static_cast<uint32_t>(bar), date)) {
+        const char* weekday = I18n::getInstance().get(DAY_LABELS[readingStatsDayOfWeekIndex(date)]);
+        const char initial[2] = {weekday[0], '\0'};
+        drawCenteredLabel(renderer, SMALL_FONT_ID, barsX + bar * barStride, barStride, chartBottom + 2, initial);
+      }
+    }
+    const uint32_t minutes = barMinutes[static_cast<size_t>(bar)];
+    if (minutes == 0) continue;
+    const int barHeight = std::min(
+        chartHeight, std::max(2, static_cast<int>((static_cast<uint64_t>(chartHeight) * minutes) / scaleMinutes)));
+    const uint32_t realMinutes = minutes - barEstimated[static_cast<size_t>(bar)];
+    const int realHeight =
+        realMinutes == 0 ? 0 : std::max(2, static_cast<int>((static_cast<int64_t>(barHeight) * realMinutes) / minutes));
+    if (realHeight > 0) renderer.fillRectDither(barX, chartBottom - realHeight, barWidth, realHeight, Color::DarkGray);
+    if (barHeight > realHeight) {
+      renderer.fillRectDither(barX, chartBottom - barHeight, barWidth, barHeight - realHeight, Color::LightGray);
+      renderer.drawRect(barX, chartBottom - barHeight, barWidth, barHeight - realHeight);
+    }
+  }
+  const int footerY = weeklyY + weeklyCardH - footerH + 1;
+  char totalValue[24];
+  formatRhythmMinutes(rhythm.totalMinutes, totalValue, sizeof(totalValue));
+  const char* totalText = tr(STR_RHYTHM_MONTHLY_TOTAL);
+  renderer.drawText(SMALL_FONT_ID, cardX + kCardPadding, footerY, totalText);
+  renderer.drawText(SMALL_FONT_ID, cardX + kCardPadding + renderer.getTextWidth(SMALL_FONT_ID, totalText) + 4, footerY,
+                    totalValue);
+  char averageValue[24];
+  formatRhythmMinutes(averageBar, averageValue, sizeof(averageValue));
+  const char* averageText = tr(STR_RHYTHM_WEEKLY_AVERAGE);
+  const int averageTextW = renderer.getTextWidth(SMALL_FONT_ID, averageText);
+  const int averageX =
+      cardX + cardW - kCardPadding - averageTextW - 4 - renderer.getTextWidth(SMALL_FONT_ID, averageValue);
+  renderer.drawText(SMALL_FONT_ID, averageX, footerY, averageText);
+  renderer.drawText(SMALL_FONT_ID, averageX + averageTextW + 4, footerY, averageValue);
+
+  // ---- Summary card: span in the title band, three stat cells below.
+  const int summaryY = weeklyY + weeklyCardH + frame.cardGap;
+  ReadingStatsDate startDate;
+  ReadingStatsDate endDate;
+  readingStatsDateFromDayIndex(rhythm.startDay, startDate);
+  readingStatsDateFromDayIndex(rhythm.endDay, endDate);
+  char startText[20];
+  char endText[20];
+  formatReadingStatsShortDate(startDate, startText, sizeof(startText));
+  formatReadingStatsShortDate(endDate, endText, sizeof(endText));
+  char spanTitle[64];
+  snprintf(spanTitle, sizeof(spanTitle), tr(STR_BOOK_SPAN_FMT), startText, endText,
+           static_cast<unsigned>(rhythm.spanDays), dayCountText(rhythm.spanDays));
+  drawStatsCardFrame(renderer, cardX, summaryY, cardW, summaryH, spanTitle, titleH);
+  const int thirdW = cardW / 3;
+  const int cellY = summaryY + titleH;
+  char value[24];
+  snprintf(value, sizeof(value), "%u", static_cast<unsigned>(rhythm.daysRead));
+  drawStatsValueCell(renderer, cardX, thirdW, cellY, summaryCellH, value, tr(STR_BOOK_DAYS_READ));
+  formatRhythmMinutes(rhythm.daysRead > 0 ? rhythm.totalMinutes / rhythm.daysRead : 0, value, sizeof(value));
+  drawStatsValueCell(renderer, cardX + thirdW, thirdW, cellY, summaryCellH, rhythm.daysRead > 0 ? value : "-",
+                     tr(STR_BOOK_AVG_PER_DAY));
+  snprintf(value, sizeof(value), "%u %s", static_cast<unsigned>(rhythm.longestStreak),
+           dayCountText(rhythm.longestStreak));
+  drawStatsValueCell(renderer, cardX + thirdW * 2, cardW - thirdW * 2, cellY, summaryCellH,
+                     rhythm.longestStreak > 0 ? value : "-", tr(STR_STATS_LONGEST_STREAK_LBL));
+
+  drawButtonHints(renderer, mappedInput, "");
+}
+
 }  // namespace RhythmStatsView

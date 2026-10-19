@@ -36,7 +36,7 @@ How often and how much you read, at a glance:
 - **Totals**: books read, total time spent on finished books, and average time per book.
 - **Recently Finished**: each finished book with its title, start → finish date, author and time spent, grouped by month.
 - The list is a scroll panel with a scroll bar: swipe up/down to scroll, or move the selection with Up/Down.
-- Tap a book (or select it and press Confirm) to open that book's own stats.
+- Tap a book (or select it and press Confirm) to open its **book detail** view: an **Overview** page (sessions, time, pace, dates, time of day, day of week) and a **Book Rhythm** page (reading days across the book's span, daily or weekly reading time, days read, average per day, longest streak). Back returns to the list.
 - Books that dropped out of Recent Books are still found by scanning the book caches already on the SD card.
 
 <table>
@@ -55,6 +55,14 @@ How often and how much you read, at a glance:
     </td>
   </tr>
 </table>
+
+### Book detail
+
+<img src="./docs/images/rhythm/book-rhythm.png" width="200" align="right" alt="Book Rhythm page for a single book" />
+
+Each finished book has its own Overview and Book Rhythm pages. Per-book reading minutes are recorded from this firmware on, in `rhythm_days.bin` next to the book's `stats_v5.bin`, which is never changed. Days before that are estimated from your real read days between the book's start and finish dates and drawn lighter. Short books (up to 3 weeks) show daily bars; longer ones show weekly bars for up to the last 13 weeks.
+
+<br clear="right"/>
 
 ### Boot screen and version
 
@@ -75,9 +83,10 @@ The pages need the device clock. On devices without one, Reading Stats keeps its
 ## How your data is handled
 
 - **Existing stats are never changed.** `global_stats.bin` stays at version 3 (159 bytes) and each book's `stats_v5.bin` is only read. Stock CrossInk can still read the same card.
-- **New data lives in two new files** under `/.crosspoint/`, both versioned and saved safely (temp file, check, `.bak`, rename):
+- **New data lives in new files only**, all versioned and saved safely (temp file, check, `.bak`, rename):
   - `daily_minutes.bin` stores minutes read per day for the last 91 days, recorded at the end of each reading session.
   - `finished_books.bin` is the Books Finished list (up to 32 books), in XPoint's file format.
+  - `<book cache>/rhythm_days.bin` stores one book's minutes per day for its Book Rhythm page.
 - **Reading days are real.** They come straight from CrossInk's existing reading history.
 - **Earlier minutes are estimated once.** Daily minutes didn't exist before this fork. The first time you open Reading Rhythm, each book's total reading time is spread over the days you actually read it. Estimated days are drawn lighter (outlined dots, light bar segments, `~` before the value). Real minutes recorded from then on always replace the estimates.
 
