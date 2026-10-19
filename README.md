@@ -60,7 +60,7 @@ How often and how much you read, at a glance:
 
 <img src="./docs/images/rhythm/book-rhythm.png" width="200" align="right" alt="Book Rhythm page for a single book" />
 
-Each finished book has its own Overview and Book Rhythm pages. Per-book reading minutes are recorded from this firmware on, in `rhythm_days.bin` next to the book's `stats_v5.bin`, which is never changed. Days before that are estimated from your real read days between the book's start and finish dates and drawn lighter. Short books (up to 3 weeks) show daily bars; longer ones show weekly bars for up to the last 13 weeks.
+Each finished book has its own Overview and Book Rhythm pages. The same view opens from **Reading Stats** in a book's long-press menu in the Library or File Browser. Per-book reading minutes are recorded from this firmware on, in `rhythm_days.bin` next to the book's `stats_v5.bin`, which is never changed. Days before that are estimated from your real read days between the book's start and finish dates and drawn lighter. Short books (up to 3 weeks) show daily bars; longer ones show weekly bars for up to the last 13 weeks.
 
 <br clear="right"/>
 
