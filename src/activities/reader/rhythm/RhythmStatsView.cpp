@@ -29,9 +29,22 @@ constexpr uint16_t kMediumReadingMinutes = 15;
 constexpr uint16_t kHighReadingMinutes = 30;
 constexpr int kCardPadding = 10;
 
+// Storage order (Monday = 0), matching readingStatsDayOfWeekIndex(). Display
+// rows index this through readingStatsStorageDayForRow() so the Week Starts On
+// setting only reorders what is drawn.
 constexpr std::array<StrId, READING_DAY_OF_WEEK_COUNT> DAY_LABELS = {
     StrId::STR_STATS_MON, StrId::STR_STATS_TUE, StrId::STR_STATS_WED, StrId::STR_STATS_THU,
     StrId::STR_STATS_FRI, StrId::STR_STATS_SAT, StrId::STR_STATS_SUN};
+
+// Label for a display row under the active Week Starts On setting.
+const char* weekdayRowLabel(const int row, const uint8_t weekStart) {
+  return I18n::getInstance().get(DAY_LABELS[readingStatsStorageDayForRow(static_cast<uint8_t>(row), weekStart)]);
+}
+
+// Label for a concrete date, which needs no row mapping.
+const char* weekdayDateLabel(const ReadingStatsDate& date) {
+  return I18n::getInstance().get(DAY_LABELS[readingStatsDayOfWeekIndex(date)]);
+}
 
 // Minutes shown for one day. Only days present in the global read-day history
 // count, so a stats reset (which clears the bits) also hides stale minutes.
@@ -257,9 +270,9 @@ void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager* ma
   const bool hasToday = getCurrentLocalReadingStatsDateTime(now);
   const uint32_t displayDay = hasToday ? readingStatsDayIndex(now.date) : stats.readingHistoryAnchorDay;
   ReadingStatsDate displayDate;
-  const bool hasDisplayDate = readingStatsDateFromDayIndex(displayDay, displayDate);
-  const uint8_t displayDow = hasDisplayDate ? readingStatsDayOfWeekIndex(displayDate) : 0;
-  const uint32_t currentWeekStart = displayDay >= displayDow ? displayDay - displayDow : 0;
+  readingStatsDateFromDayIndex(displayDay, displayDate);
+  const uint8_t weekStart = SETTINGS.weekStartDay;
+  const uint32_t currentWeekStart = readingStatsWeekStartDay(displayDay, weekStart);
   const uint32_t historySpanBeforeCurrentWeek = static_cast<uint32_t>(kReadingRhythmWeekCount - 1) * 7u;
   const uint32_t firstDay =
       currentWeekStart >= historySpanBeforeCurrentWeek ? currentWeekStart - historySpanBeforeCurrentWeek : 0;
@@ -289,7 +302,7 @@ void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager* ma
   for (int weekday = 0; weekday < 7; ++weekday) {
     const int rowCenterY = gridTop + weekday * rowStride + rowStride / 2;
     renderer.drawText(SMALL_FONT_ID, cardX + kCardPadding, rowCenterY - m.smallH / 2,
-                      I18n::getInstance().get(DAY_LABELS[weekday]));
+                      weekdayRowLabel(weekday, weekStart));
 
     for (int week = 0; week < kReadingRhythmWeekCount; ++week) {
       const uint32_t dayIndex = firstDay + static_cast<uint32_t>(week) * 7u + static_cast<uint32_t>(weekday);
@@ -344,8 +357,7 @@ void renderReadingRhythmPage(GfxRenderer& renderer, const MappedInputManager* ma
     if (hasToday && dayIndex == displayDay) {
       renderer.drawRoundedRect(columnX + 1, recentDaysY + 3, recentDayW - 2, m.recentH - 6, 1, 4, true);
     }
-    drawCenteredLabel(renderer, SMALL_FONT_ID, columnX, recentDayW, recentDayLabelY,
-                      I18n::getInstance().get(DAY_LABELS[readingStatsDayOfWeekIndex(date)]));
+    drawCenteredLabel(renderer, SMALL_FONT_ID, columnX, recentDayW, recentDayLabelY, weekdayDateLabel(date));
 
     const DayMinutes day = minutesOnDay(stats, minutesLog, dayIndex);
     char value[20];
@@ -730,10 +742,11 @@ void renderBookRhythmPage(GfxRenderer& renderer, const MappedInputManager* mappe
     }
   }
 
+  const uint8_t weekStartDay = SETTINGS.weekStartDay;
   for (int weekday = 0; weekday < 7; ++weekday) {
     const int rowCenterY = gridTop + weekday * rowStride + rowStride / 2;
     renderer.drawText(SMALL_FONT_ID, cardX + kCardPadding, rowCenterY - smallH / 2,
-                      I18n::getInstance().get(DAY_LABELS[weekday]));
+                      weekdayRowLabel(weekday, weekStartDay));
     for (int week = 0; week < rhythm.weekCount; ++week) {
       const uint32_t dayIndex =
           rhythm.firstShownDay + static_cast<uint32_t>(week) * 7u + static_cast<uint32_t>(weekday);
@@ -814,7 +827,7 @@ void renderBookRhythmPage(GfxRenderer& renderer, const MappedInputManager* mappe
       // Weekday initial under each day bar.
       ReadingStatsDate date;
       if (readingStatsDateFromDayIndex(rhythm.startDay + static_cast<uint32_t>(bar), date)) {
-        const char* weekday = I18n::getInstance().get(DAY_LABELS[readingStatsDayOfWeekIndex(date)]);
+        const char* weekday = weekdayDateLabel(date);
         const char initial[2] = {weekday[0], '\0'};
         drawCenteredLabel(renderer, SMALL_FONT_ID, barsX + bar * barStride, barStride, chartBottom + 2, initial);
       }

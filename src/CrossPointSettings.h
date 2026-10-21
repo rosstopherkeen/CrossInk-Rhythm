@@ -430,6 +430,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     QUICK_RESUME_SLEEP_SCREEN_COUNT
   };
 
+  // First column of the Reading Rhythm calendars. Display order only: the
+  // persisted dayOfWeekSeconds[] buckets stay Monday = 0 (see ReadingStatsUtils).
+  enum WEEK_START_DAY : uint8_t { WEEK_START_SUNDAY = 0, WEEK_START_MONDAY = 1, WEEK_START_DAY_COUNT };
+
   // UI scale for list-style screens: sizes list fonts and row heights
   // together so touch targets grow uniformly.
   enum UI_SCALE { UI_SCALE_SMALL = 0, UI_SCALE_LARGE = 1, UI_SCALE_COUNT };
@@ -692,6 +696,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
   // Master switch for automatic reading statistics; Time Left pace remains independent.
   uint8_t trackReadingStats = 1;
+  // First weekday shown in the Reading Rhythm calendars.
+  uint8_t weekStartDay = WEEK_START_SUNDAY;
 
   ~CrossPointSettings() = default;
 

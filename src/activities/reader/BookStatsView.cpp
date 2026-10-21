@@ -84,6 +84,25 @@ constexpr std::array<StrId, READING_DAY_OF_WEEK_COUNT> DAY_LABELS = {
     StrId::STR_STATS_MON, StrId::STR_STATS_TUE, StrId::STR_STATS_WED, StrId::STR_STATS_THU,
     StrId::STR_STATS_FRI, StrId::STR_STATS_SAT, StrId::STR_STATS_SUN};
 
+// Day of Week chart rows in display order. The persisted dayOfWeekSeconds[]
+// buckets stay Monday = 0, so the Week Starts On setting is applied here, at
+// draw time, and never to the stored data.
+struct DayOfWeekChart {
+  std::array<uint32_t, READING_DAY_OF_WEEK_COUNT> values{};
+  std::array<StrId, READING_DAY_OF_WEEK_COUNT> labels{};
+};
+
+DayOfWeekChart dayOfWeekChart(const std::array<uint32_t, READING_DAY_OF_WEEK_COUNT>& stored) {
+  DayOfWeekChart chart;
+  const uint8_t weekStart = SETTINGS.weekStartDay;
+  for (uint8_t row = 0; row < READING_DAY_OF_WEEK_COUNT; ++row) {
+    const uint8_t storageDay = readingStatsStorageDayForRow(row, weekStart);
+    chart.values[row] = stored[storageDay];
+    chart.labels[row] = DAY_LABELS[storageDay];
+  }
+  return chart;
+}
+
 const char* dayCountText(const uint16_t days) { return days == 1 ? tr(STR_STATS_DAY) : tr(STR_STATS_DAYS); }
 
 int sectionCardHeight(const StatsLayout& layout, const int rowCount) {
@@ -508,7 +527,8 @@ void renderPerBookStatsPage(GfxRenderer& renderer, const MappedInputManager* map
     y += timeOfDayCardH + layout.cardGap;
 
     drawSectionCard(renderer, cardX, y, cardW, dayOfWeekCardH, tr(STR_STATS_DAY_OF_WEEK), layout);
-    drawHorizontalBars(renderer, cardX, y, cardW, dayOfWeekCardH, stats.dayOfWeekSeconds, DAY_LABELS, layout);
+    const DayOfWeekChart weekChart = dayOfWeekChart(stats.dayOfWeekSeconds);
+    drawHorizontalBars(renderer, cardX, y, cardW, dayOfWeekCardH, weekChart.values, weekChart.labels, layout);
   } else {
     const int compactContentHeight = headerHeight + layout.topGap + layout.topCardH;
     const int extraHeight = std::max(0, availableHeight - compactContentHeight);
@@ -582,7 +602,8 @@ void renderGlobalStatsPage(GfxRenderer& renderer, const MappedInputManager* mapp
     y += timeOfDayCardH + layout.cardGap;
 
     drawSectionCard(renderer, cardX, y, cardW, dayOfWeekCardH, tr(STR_STATS_DAY_OF_WEEK), layout);
-    drawHorizontalBars(renderer, cardX, y, cardW, dayOfWeekCardH, stats.dayOfWeekSeconds, DAY_LABELS, layout);
+    const DayOfWeekChart weekChart = dayOfWeekChart(stats.dayOfWeekSeconds);
+    drawHorizontalBars(renderer, cardX, y, cardW, dayOfWeekCardH, weekChart.values, weekChart.labels, layout);
   } else {
     const int compactContentHeight = headerHeight + layout.topGap + layout.globalCardH;
     globalCardH += std::max(0, availableHeight - compactContentHeight);

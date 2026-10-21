@@ -310,7 +310,7 @@ void BookStatsActivity::showPage(const Page newPage) {
     ReadingStatsDateTime now;
     const uint32_t today = getCurrentLocalReadingStatsDateTime(now) ? readingStatsDayIndex(now.date) : 0;
     BookRhythm::build(stats, today, globalStats.readingHistoryAnchorDay, globalStats.readingHistoryBits,
-                      BookDailyMinutes::load(bookCachePath), bookRhythm);
+                      BookDailyMinutes::load(bookCachePath), SETTINGS.weekStartDay, bookRhythm);
     bookRhythmLoaded = true;
   }
   if (newPage == Page::ReadingRhythm && !rhythmLoaded) {

@@ -25,6 +25,10 @@ constexpr char INDEX_PATH[] = "/.crosspoint/finished_books.bin";
 constexpr char INDEX_BAK[] = "/.crosspoint/finished_books.bin.bak";
 constexpr char GLOBAL_PATH[] = "/.crosspoint/global_stats.bin";
 
+// CrossPointSettings::WEEK_START_DAY values; the host stub has no settings enum.
+constexpr uint8_t WEEK_START_SUNDAY = 0;
+constexpr uint8_t WEEK_START_MONDAY = 1;
+
 uint32_t day(const uint16_t y, const uint8_t m, const uint8_t d) { return readingStatsDayIndex({y, m, d}); }
 
 ReadingStatsDateTime at(const uint16_t y, const uint8_t m, const uint8_t d, const uint8_t h, const uint8_t mi) {
@@ -548,7 +552,7 @@ TEST_F(RhythmTest, FinishedBookEstimatesOnlyGlobalReadDaysInWindow) {
   }
   BookRhythm rhythm;
   ASSERT_TRUE(BookRhythm::build(bookStats({2026, 10, 1}, {2026, 10, 7}, 40 * 60, 2), day(2026, 10, 16), history.anchor,
-                                history.bits, BookDailyMinutes{}, rhythm));
+                                history.bits, BookDailyMinutes{}, WEEK_START_MONDAY, rhythm));
   // k = min(2 sessions, 4 read days) = 2, evenly spaced: Oct 1 and Oct 5, 20 min each.
   EXPECT_EQ(rhythm.daysRead, 2);
   EXPECT_EQ(rhythm.totalMinutes, 40u);
@@ -576,7 +580,7 @@ TEST_F(RhythmTest, OngoingBookWindowEndsTodayAndRealOverridesEstimates) {
 
   BookRhythm rhythm;
   ASSERT_TRUE(BookRhythm::build(bookStats({2026, 10, 10}, {}, (30 + 15 + 60) * 60, 6, false), day(2026, 10, 16),
-                                history.anchor, history.bits, real, rhythm));
+                                history.anchor, history.bits, real, WEEK_START_MONDAY, rhythm));
   EXPECT_EQ(rhythm.endDay, day(2026, 10, 16));
   // Real days use real minutes.
   EXPECT_EQ(rhythm.dayAt(day(2026, 10, 14)).minutes, 30);
@@ -597,17 +601,61 @@ TEST_F(RhythmTest, LongBookShowsLastThirteenWeeks) {
   for (uint32_t d = day(2026, 3, 1); d <= day(2026, 10, 1); d += 3) history.mark(d);
   BookRhythm rhythm;
   ASSERT_TRUE(BookRhythm::build(bookStats({2026, 3, 1}, {2026, 10, 1}, 3600 * 40, 80), day(2026, 10, 16),
-                                history.anchor, history.bits, BookDailyMinutes{}, rhythm));
+                                history.anchor, history.bits, BookDailyMinutes{}, WEEK_START_MONDAY, rhythm));
   EXPECT_TRUE(rhythm.truncated);
   EXPECT_EQ(rhythm.weekCount, BookRhythm::MAX_WEEKS);
   EXPECT_GT(rhythm.daysRead, 40);                       // summary covers the whole window, not just the shown weeks
   EXPECT_EQ(rhythm.dayAt(day(2026, 3, 1)).minutes, 0);  // before the shown weeks
 }
 
+TEST_F(RhythmTest, WeekStartMovesTheGridOriginWithoutChangingTotals) {
+  History history;
+  for (const uint32_t d : {day(2026, 10, 1), day(2026, 10, 3), day(2026, 10, 5), day(2026, 10, 7)}) history.mark(d);
+  const BookReadingStats stats = bookStats({2026, 10, 1}, {2026, 10, 7}, 40 * 60, 2);
+
+  // Thu Oct 1 2026 to Wed Oct 7 2026 spans two weeks either way, but the weeks
+  // start on different days: Mon Sep 28 vs Sun Sep 27.
+  BookRhythm monday;
+  ASSERT_TRUE(BookRhythm::build(stats, day(2026, 10, 16), history.anchor, history.bits, BookDailyMinutes{},
+                                WEEK_START_MONDAY, monday));
+  EXPECT_EQ(monday.firstShownDay, day(2026, 9, 28));
+
+  BookRhythm sunday;
+  ASSERT_TRUE(BookRhythm::build(stats, day(2026, 10, 16), history.anchor, history.bits, BookDailyMinutes{},
+                                WEEK_START_SUNDAY, sunday));
+  EXPECT_EQ(sunday.firstShownDay, day(2026, 9, 27));
+
+  // Week start is a display concern only: the derived totals must not move.
+  EXPECT_EQ(sunday.weekCount, monday.weekCount);
+  EXPECT_EQ(sunday.daysRead, monday.daysRead);
+  EXPECT_EQ(sunday.totalMinutes, monday.totalMinutes);
+  EXPECT_EQ(sunday.longestStreak, monday.longestStreak);
+  EXPECT_EQ(sunday.spanDays, monday.spanDays);
+  for (const uint32_t d : {day(2026, 10, 1), day(2026, 10, 5)}) {
+    EXPECT_EQ(sunday.dayAt(d).minutes, monday.dayAt(d).minutes) << "day " << d;
+  }
+}
+
+TEST_F(RhythmTest, WeekdayRowMappingRoundTrips) {
+  for (uint8_t weekStart : {WEEK_START_SUNDAY, WEEK_START_MONDAY}) {
+    for (uint8_t row = 0; row < READING_DAY_OF_WEEK_COUNT; ++row) {
+      const uint8_t storageDay = readingStatsStorageDayForRow(row, weekStart);
+      EXPECT_LT(storageDay, READING_DAY_OF_WEEK_COUNT);
+      // A day with that storage weekday must map back to the same row.
+      const uint32_t sample = day(2026, 10, 5) + storageDay;  // Mon Oct 5 2026 is storage day 0
+      EXPECT_EQ(readingStatsWeekdayRow(sample, weekStart), row);
+    }
+  }
+  // Sunday-first puts Sunday (storage 6) in the top row; Monday-first keeps it last.
+  EXPECT_EQ(readingStatsStorageDayForRow(0, WEEK_START_SUNDAY), 6);
+  EXPECT_EQ(readingStatsStorageDayForRow(0, WEEK_START_MONDAY), 0);
+}
+
 TEST_F(RhythmTest, BookWithoutStartDateHasNoRhythm) {
   BookRhythm rhythm;
   EXPECT_FALSE(
-      BookRhythm::build(bookStats({}, {2026, 10, 1}, 3600, 2), day(2026, 10, 16), 0, {}, BookDailyMinutes{}, rhythm));
+      BookRhythm::build(bookStats({}, {2026, 10, 1}, 3600, 2), day(2026, 10, 16), 0, {}, BookDailyMinutes{},
+                        WEEK_START_MONDAY, rhythm));
   EXPECT_FALSE(rhythm.valid());
 }
 

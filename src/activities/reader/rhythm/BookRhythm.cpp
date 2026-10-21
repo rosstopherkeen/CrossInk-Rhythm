@@ -7,16 +7,6 @@
 
 #include "DailyMinutesBackfill.h"
 
-namespace {
-
-// 2000-01-01 (day 0) was a Saturday; Monday = 0 as in readingStatsDayOfWeekIndex().
-uint32_t mondayOf(const uint32_t dayIndex) {
-  const uint32_t dow = (5u + dayIndex) % 7u;
-  return dayIndex >= dow ? dayIndex - dow : 0;
-}
-
-}  // namespace
-
 BookRhythm::Day BookRhythm::dayAt(const uint32_t dayIndex) const {
   if (!valid() || dayIndex < firstShownDay || dayIndex < startDay || dayIndex > endDay) return {};
   const uint32_t offset = dayIndex - firstShownDay;
@@ -25,7 +15,7 @@ BookRhythm::Day BookRhythm::dayAt(const uint32_t dayIndex) const {
 
 bool BookRhythm::build(const BookReadingStats& stats, const uint32_t todayDay, const uint32_t historyAnchorDay,
                        const std::array<uint8_t, READING_HISTORY_BYTES>& historyBits, const BookDailyMinutes& real,
-                       BookRhythm& out) {
+                       const uint8_t weekStart, BookRhythm& out) {
   out = BookRhythm{};
   if (!stats.startDate.isValid()) return false;
   const uint32_t start = readingStatsDayIndex(stats.startDate);
@@ -84,12 +74,12 @@ bool BookRhythm::build(const BookReadingStats& stats, const uint32_t todayDay, c
             [&merged](const size_t a, const size_t b) { return merged[a].day < merged[b].day; });
 
   // Displayed weeks: whole window, or its last MAX_WEEKS weeks.
-  const uint32_t firstMonday = mondayOf(start);
-  const uint32_t lastMonday = mondayOf(end);
-  const uint32_t weeks = (lastMonday - firstMonday) / 7u + 1u;
+  const uint32_t firstWeekStart = readingStatsWeekStartDay(start, weekStart);
+  const uint32_t lastWeekStart = readingStatsWeekStartDay(end, weekStart);
+  const uint32_t weeks = (lastWeekStart - firstWeekStart) / 7u + 1u;
   out.truncated = weeks > static_cast<uint32_t>(MAX_WEEKS);
   out.weekCount = static_cast<int>(std::min<uint32_t>(weeks, MAX_WEEKS));
-  out.firstShownDay = out.truncated ? lastMonday - static_cast<uint32_t>(MAX_WEEKS - 1) * 7u : firstMonday;
+  out.firstShownDay = out.truncated ? lastWeekStart - static_cast<uint32_t>(MAX_WEEKS - 1) * 7u : firstWeekStart;
 
   uint32_t previousDay = 0;
   uint16_t streak = 0;

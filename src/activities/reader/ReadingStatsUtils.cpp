@@ -209,10 +209,33 @@ bool readingStatsDateFromDayIndex(uint32_t dayIndex, ReadingStatsDate& outDate) 
   return true;
 }
 
+namespace {
+// CrossPointSettings::WEEK_START_SUNDAY. Kept local so this file stays free of
+// the settings header, which the host tests do not build.
+constexpr uint8_t WEEK_START_SUNDAY_VALUE = 0;
+
+// 2000-01-01 (day 0) was a Saturday. Convert so Monday = 0.
+uint8_t storageDayOfWeek(const uint32_t dayIndex) { return static_cast<uint8_t>((5u + dayIndex) % 7u); }
+}  // namespace
+
 uint8_t readingStatsDayOfWeekIndex(const ReadingStatsDate& date) {
-  // 2000-01-01 was a Saturday. Convert so Monday = 0.
-  const uint32_t dayIndex = readingStatsDayIndex(date);
-  return static_cast<uint8_t>((5u + dayIndex) % 7u);
+  return storageDayOfWeek(readingStatsDayIndex(date));
+}
+
+uint8_t readingStatsWeekdayRow(const uint32_t dayIndex, const uint8_t weekStart) {
+  const uint8_t storageDay = storageDayOfWeek(dayIndex);
+  // Sunday is storage index 6, so it moves to row 0 and every other day shifts down one.
+  return weekStart == WEEK_START_SUNDAY_VALUE ? static_cast<uint8_t>((storageDay + 1u) % 7u) : storageDay;
+}
+
+uint8_t readingStatsStorageDayForRow(const uint8_t row, const uint8_t weekStart) {
+  const uint8_t wrapped = static_cast<uint8_t>(row % 7u);
+  return weekStart == WEEK_START_SUNDAY_VALUE ? static_cast<uint8_t>((wrapped + 6u) % 7u) : wrapped;
+}
+
+uint32_t readingStatsWeekStartDay(const uint32_t dayIndex, const uint8_t weekStart) {
+  const uint32_t row = readingStatsWeekdayRow(dayIndex, weekStart);
+  return dayIndex >= row ? dayIndex - row : 0;
 }
 
 ReadingTimeBucket readingTimeBucketForHour(const uint8_t hour) {

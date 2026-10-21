@@ -7,6 +7,7 @@
 - Book detail view from Books Finished: an Overview page (that book's stats, time of day and day of week) and a Book Rhythm page (reading days across the book's span, daily or weekly reading time, days read, average per day, longest streak). Per-book daily minutes are now recorded; earlier days are estimated and shown lighter. The same book view opens from a book's Reading Stats action in the Library and File Browser long-press menu.
 - New CrossInk-Rhythm boot screen.
 - Daily reading minutes are now recorded for the Reading Rhythm screen. Minutes for days read before updating are estimated once from each book's reading time and shown lighter.
+- A Week Starts On setting (Settings > Reading Stats) that chooses whether the Reading Rhythm calendar, the Book Rhythm grid, and the Day of Week chart begin on Sunday or Monday. Defaults to Sunday.
 
 ### Changed
 

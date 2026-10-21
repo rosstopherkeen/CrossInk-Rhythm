@@ -586,7 +586,7 @@ inline SettingInfo buildSideButtonActionSetting(const StrId nameId, uint8_t Cros
 // can use it directly; mutable device UI lists use getSettingsList(), which
 // returns an owned copy and can add SD-card font and dictionary options.
 // Four edge gesture entries are compiled only for touch devices.
-inline constexpr size_t BASE_SETTINGS_CAPACITY = 104 + (CROSSINK_APP_CAP_TOUCH ? 4 : 0);
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 105 + (CROSSINK_APP_CAP_TOUCH ? 4 : 0);
 
 const std::vector<SettingInfo>& getBaseSettingsList();
 
@@ -1093,11 +1093,12 @@ inline std::vector<SettingInfo> buildFileBrowserSettingsList(const std::vector<S
 
 inline std::vector<SettingInfo> buildSystemReadingStatsSettingsList(const std::vector<SettingInfo>& allSettings) {
   std::vector<SettingInfo> settings;
-  settings.reserve(3);
+  settings.reserve(4);
   addSettingByName(settings, allSettings, StrId::STR_TRACK_READING_STATS);
   if (!SETTINGS.shouldTrackReadingStats()) return settings;
   settings.push_back(SettingInfo::Submenu(StrId::STR_ALL_TIME_STATS, SettingAction::SystemGlobalStats));
   addSettingByName(settings, allSettings, StrId::STR_IDLE_TIME_THRESHOLD);
+  addSettingByName(settings, allSettings, StrId::STR_WEEK_STARTS_ON);
   return settings;
 }
 

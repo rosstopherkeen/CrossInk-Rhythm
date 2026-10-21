@@ -26,7 +26,7 @@ struct BookRhythm {
 
   uint32_t startDay = 0;       // window start (day index)
   uint32_t endDay = 0;         // window end, inclusive
-  uint32_t firstShownDay = 0;  // Monday of the first displayed week
+  uint32_t firstShownDay = 0;  // first day of the first displayed week
   int weekCount = 0;           // displayed weeks, 1..MAX_WEEKS
   bool truncated = false;      // window longer than MAX_WEEKS weeks
   std::array<Day, MAX_WEEKS * 7> grid{};
@@ -43,8 +43,10 @@ struct BookRhythm {
   Day dayAt(uint32_t dayIndex) const;
 
   // todayDay is today's day index, or 0 when no clock date is available.
+  // weekStart takes CrossPointSettings::WEEK_START_DAY values and only decides
+  // which weekday each displayed week begins on.
   // Returns false when the book has no usable start date.
   static bool build(const BookReadingStats& stats, uint32_t todayDay, uint32_t historyAnchorDay,
                     const std::array<uint8_t, READING_HISTORY_BYTES>& historyBits, const BookDailyMinutes& real,
-                    BookRhythm& out);
+                    uint8_t weekStart, BookRhythm& out);
 };

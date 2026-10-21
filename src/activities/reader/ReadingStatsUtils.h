@@ -38,6 +38,15 @@ void addSecondsToReadingStatsDateTime(ReadingStatsDateTime& dt, uint32_t seconds
 uint32_t readingStatsDayIndex(const ReadingStatsDate& date);
 bool readingStatsDateFromDayIndex(uint32_t dayIndex, ReadingStatsDate& outDate);
 uint8_t readingStatsDayOfWeekIndex(const ReadingStatsDate& date);  // Monday = 0
+
+// Display-order helpers for the calendar surfaces. Storage order is fixed at
+// Monday = 0 because readingStatsDayOfWeekIndex() also indexes the persisted
+// dayOfWeekSeconds[] buckets; these only reorder what is drawn. weekStart takes
+// CrossPointSettings::WEEK_START_DAY values, but the type stays plain uint8_t so
+// this header remains free of device singletons for the host tests.
+uint8_t readingStatsWeekdayRow(uint32_t dayIndex, uint8_t weekStart);     // 0 = first row shown
+uint8_t readingStatsStorageDayForRow(uint8_t row, uint8_t weekStart);     // inverse, for labels
+uint32_t readingStatsWeekStartDay(uint32_t dayIndex, uint8_t weekStart);  // first day of that week
 ReadingTimeBucket readingTimeBucketForHour(uint8_t hour);
 bool getCurrentLocalReadingStatsDateTime(ReadingStatsDateTime& outDateTime);
 uint16_t readingSpanDaysInclusive(const ReadingStatsDate& start, const ReadingStatsDate& end);
