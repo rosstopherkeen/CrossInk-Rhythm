@@ -37,9 +37,22 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     QUICK_RESUME = 9,
     MINIMAL_STATS_SLEEP = 10,
     DASHBOARD_SLEEP = 11,
+    REACTION_DIFFUSION = 12,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
+  // Reaction sleep screen pattern. SIM_RANDOM picks a different one each time
+  // the image is regenerated; the rest stay on their own rates.
+  enum SLEEP_SIMULATION : uint8_t {
+    SIM_RANDOM = 0,
+    SIM_USKATE = 1,
+    SIM_MAZE = 2,
+    SIM_WORMS = 3,
+    SIM_SOLITONS = 4,
+    SIM_HOLES = 5,
+    SIM_CHAOS = 6,
+    SLEEP_SIMULATION_COUNT
+  };
   enum SLEEP_SCREEN_COVER_FILTER {
     NO_FILTER = 0,
     BLACK_AND_WHITE = 1,
@@ -448,6 +461,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
   uint8_t sleepScreenCoverFilter = NO_FILTER;
+  // Reaction sleep screen pattern
+  uint8_t sleepScreenSimulation = SIM_RANDOM;
   // Status bar settings (statusBar retained for migration only)
   uint8_t statusBar = FULL;
   uint8_t statusBarChapterPageCount = 1;

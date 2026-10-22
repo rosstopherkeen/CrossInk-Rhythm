@@ -93,6 +93,7 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/boot_sleep/ImageFolderIndex.h"
+#include "activities/boot_sleep/SleepArtGenerator.h"
 #include "activities/home/BookActions.h"
 #include "activities/reader/KOReaderSyncActivity.h"
 #include "activities/reader/ReaderUtils.h"
@@ -992,6 +993,12 @@ bool handleX4ProHomeKeyShortcuts() {
 }  // namespace
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
+// Idle time before the Reaction sleep screen starts building, and how long each
+// slice may run. Short slices keep the UI responsive; the delay keeps the work
+// out of ordinary pauses in reading.
+constexpr unsigned long SLEEP_ART_IDLE_DELAY_MS = 15000;
+constexpr uint32_t SLEEP_ART_SLICE_MS = 20;
+
 static void saveSleepFrameBuffer() {
   HalFile file;
   if (!Storage.openFileForWrite("SLP", SLEEP_FRAME_FILE, file)) return;
@@ -1085,6 +1092,8 @@ void mirrorWakeShortPressToNvs() {
 
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout) {
+  // Release the generator's grid before the sleep screen needs memory.
+  SleepArtGenerator::abandon();
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
@@ -1797,6 +1806,23 @@ void loop() {
   if (handleX4ProHomeKeyShortcuts()) {
     // Simulator Home-key events bypass HalGPIO's raw touch activity signal.
     activityManager.notifyUserInput();
+    return;
+  }
+
+  // Build the next Reaction sleep screen out of idle time. Waking is a full
+  // reboot, so there is no unlock hook to hang this off; doing it at lock would
+  // add seconds to every lock instead. Slices are small and stop on any input,
+  // so this only ever consumes time the device was idling away.
+  const unsigned long idleMs = millis() - lastActivityTime;
+  if (idleMs < SLEEP_ART_IDLE_DELAY_MS) {
+    // Input arrived: give the grid's memory back rather than holding it through
+    // a reading session. Generation only needs a short uninterrupted stretch,
+    // and the idle window before sleep reliably provides one.
+    SleepArtGenerator::abandon();
+  } else if (SleepArtGenerator::needsWork()) {
+    // Portrait is the orientation the sleep screen renders in, whatever is on
+    // screen right now.
+    SleepArtGenerator::runSlice(renderer.getDisplayHeight(), renderer.getDisplayWidth(), SLEEP_ART_SLICE_MS);
     return;
   }
 

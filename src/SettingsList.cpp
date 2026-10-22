@@ -17,6 +17,10 @@ const std::vector<SettingInfo>& getBaseSettingsList() {
                           "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY));
     add(SettingInfo::Toggle(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
                             "quickResumeSleepScreen", StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Enum(StrId::STR_SLEEP_SIMULATION, &CrossPointSettings::sleepScreenSimulation,
+                          {StrId::STR_SIM_RANDOM, StrId::STR_SIM_USKATE, StrId::STR_SIM_MAZE, StrId::STR_SIM_WORMS,
+                           StrId::STR_SIM_SOLITONS, StrId::STR_SIM_HOLES, StrId::STR_SIM_CHAOS},
+                          "sleepScreenSimulation", StrId::STR_CAT_DISPLAY));
     add(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
                           {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
                           StrId::STR_CAT_DISPLAY));

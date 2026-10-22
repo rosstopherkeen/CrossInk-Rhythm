@@ -8,6 +8,7 @@
 - New CrossInk-Rhythm boot screen.
 - Daily reading minutes are now recorded for the Reading Rhythm screen. Minutes for days read before updating are estimated once from each book's reading time and shown lighter.
 - A Week Starts On setting (Settings > Reading Stats) that chooses whether the Reading Rhythm calendar, the Book Rhythm grid, and the Day of Week chart begin on Sunday or Monday. Defaults to Sunday.
+- A Reaction sleep screen wallpaper that grows a reaction-diffusion pattern around a built-in mask, with a new random seed each time the device sleeps. Pick a pattern under Settings > Display > Sleep Screen > Simulation, or leave it on Random for a different one each time. The image is built ahead of time while the device is idle, so locking stays as fast as any other sleep screen, and Cover Filter > Inverted flips it to light-on-dark.
 
 ### Changed
 

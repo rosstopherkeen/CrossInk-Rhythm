@@ -36,6 +36,7 @@
 #include "CrossPointState.h"
 #include "ImageFolderIndex.h"
 #include "RecentBooksStore.h"
+#include "SleepArtGenerator.h"
 #include "SleepCoverAssets.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
@@ -582,6 +583,8 @@ void SleepActivity::onEnter() {
       return renderMinimalStatsSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::DASHBOARD_SLEEP):
       return renderDashboardSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::REACTION_DIFFUSION):
+      return renderReactionSleepScreen();
     default:
       return renderDefaultSleepScreen();
   }
@@ -601,6 +604,11 @@ bool SleepActivity::rendersBeforeExit() const {
     case CrossPointSettings::SLEEP_SCREEN_MODE::BLANK:
     case CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM:
       return true;
+    case CrossPointSettings::SLEEP_SCREEN_MODE::REACTION_DIFFUSION: {
+      // Drawing is only a file read when the image is already generated.
+      size_t bytes = 0;
+      return SleepArtGenerator::cacheIsReady(renderer.getScreenWidth(), renderer.getScreenHeight(), bytes);
+    }
     case CrossPointSettings::SLEEP_SCREEN_MODE::COVER:
     case CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM: {
       if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM &&
@@ -966,6 +974,57 @@ void SleepActivity::renderLastScreenSleepScreen() const {
   } else {
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
   }
+}
+
+void SleepActivity::renderReactionSleepScreen() const {
+  const int pageWidth = renderer.getScreenWidth();
+  const int pageHeight = renderer.getScreenHeight();
+
+  struct DrawContext {
+    const GfxRenderer* renderer;
+    int width;
+  };
+  // Draw runs of set bits rather than individual pixels: the pattern is made of
+  // short horizontal runs, so this is far fewer orientation-aware calls than one
+  // per pixel while producing exactly the same image.
+  const auto drawRow = [](const int y, const uint8_t* row, size_t, void* ctx) {
+    const auto& context = *static_cast<DrawContext*>(ctx);
+    int x = 0;
+    while (x < context.width) {
+      while (x < context.width && !((row[x >> 3] >> (7 - (x & 7))) & 1u)) ++x;
+      if (x >= context.width) break;
+      const int start = x;
+      while (x < context.width && ((row[x >> 3] >> (7 - (x & 7))) & 1u)) ++x;
+      context.renderer->fillRect(start, y, x - start, 1, true);
+    }
+  };
+
+  renderer.clearScreen();
+  DrawContext context{&renderer, pageWidth};
+  if (SleepArtGenerator::readCache(pageWidth, pageHeight, drawRow, &context)) {
+    // Rotate: the next idle stretch generates a fresh seed, and a fresh preset
+    // when Simulation is Random.
+    SleepArtGenerator::clearCache();
+  } else {
+    // Nothing generated yet (first sleep after enabling, or a panel change).
+    // The mask alone is a sensible screen rather than a blank one.
+    LOG_INF("SLP", "No reaction sleep art yet; drawing the mask");
+    const size_t rowBytes = static_cast<size_t>(pageWidth + 7) / 8u;
+    auto row = makeUniqueNoThrow<uint8_t[]>(rowBytes);
+    if (row) {
+      for (int y = 0; y < pageHeight; ++y) {
+        SleepArtGenerator::maskRow(y, pageWidth, pageHeight, row.get(), rowBytes);
+        drawRow(y, row.get(), rowBytes, &context);
+      }
+    }
+  }
+
+  // Reuse the existing Cover Filter rather than adding a polarity setting of
+  // its own: Inverted gives the light-on-dark version of the same image.
+  if (SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE) {
+    renderer.invertScreen();
+  }
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH);
 }
 
 void SleepActivity::renderBlankSleepScreen() const {

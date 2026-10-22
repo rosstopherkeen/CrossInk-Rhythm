@@ -334,7 +334,8 @@ inline SettingInfo buildSleepScreenSetting() {
       StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
       {StrId::STR_NONE_OPT, StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER,
        StrId::STR_COVER_CUSTOM, StrId::STR_PAGE_OVERLAY, StrId::STR_READING_STATS, StrId::STR_THEME_MINIMAL,
-       StrId::STR_THEME_MINIMAL_STATS, StrId::STR_THEME_DASHBOARD, StrId::STR_QUICK_RESUME},
+       StrId::STR_THEME_MINIMAL_STATS, StrId::STR_THEME_DASHBOARD, StrId::STR_QUICK_RESUME,
+       StrId::STR_SLEEP_REACTION},
       "sleepScreen", StrId::STR_CAT_DISPLAY);
   s.withEnumRawValues({
       static_cast<uint8_t>(CrossPointSettings::BLANK),
@@ -349,6 +350,7 @@ inline SettingInfo buildSleepScreenSetting() {
       static_cast<uint8_t>(CrossPointSettings::MINIMAL_STATS_SLEEP),
       static_cast<uint8_t>(CrossPointSettings::DASHBOARD_SLEEP),
       static_cast<uint8_t>(CrossPointSettings::QUICK_RESUME),
+      static_cast<uint8_t>(CrossPointSettings::REACTION_DIFFUSION),
   });
   return s;
 }
@@ -586,7 +588,7 @@ inline SettingInfo buildSideButtonActionSetting(const StrId nameId, uint8_t Cros
 // can use it directly; mutable device UI lists use getSettingsList(), which
 // returns an owned copy and can add SD-card font and dictionary options.
 // Four edge gesture entries are compiled only for touch devices.
-inline constexpr size_t BASE_SETTINGS_CAPACITY = 105 + (CROSSINK_APP_CAP_TOUCH ? 4 : 0);
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 106 + (CROSSINK_APP_CAP_TOUCH ? 4 : 0);
 
 const std::vector<SettingInfo>& getBaseSettingsList();
 
@@ -1031,7 +1033,13 @@ inline std::vector<SettingInfo> buildDisplaySleepSettingsList(const std::vector<
   };
 
   addSleepSetting(StrId::STR_SLEEP_SCREEN, StrId::STR_SLEEP_SCREEN_WALLPAPER);
-  addSleepSetting(StrId::STR_SLEEP_COVER_MODE, StrId::STR_SLEEP_COVER_MODE_SHORT);
+  // The generated image already fills the panel, so there is no Fit/Crop choice
+  // to make; the row carries the pattern picker instead.
+  if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::REACTION_DIFFUSION) {
+    addSleepSetting(StrId::STR_SLEEP_SIMULATION, StrId::STR_SLEEP_SIMULATION_SHORT);
+  } else {
+    addSleepSetting(StrId::STR_SLEEP_COVER_MODE, StrId::STR_SLEEP_COVER_MODE_SHORT);
+  }
   addSleepSetting(StrId::STR_SLEEP_COVER_FILTER, StrId::STR_SLEEP_COVER_FILTER_SHORT);
   addSleepSetting(StrId::STR_QUICK_RESUME_TIMEOUT, StrId::STR_QUICK_RESUME_TIMEOUT);
 

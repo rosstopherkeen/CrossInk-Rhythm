@@ -31,6 +31,7 @@ class SleepActivity final : public Activity {
   bool renderBitmapSleepScreen(Bitmap& bitmap) const;
   void renderLastScreenSleepScreen() const;
   void renderBlankSleepScreen() const;
+  void renderReactionSleepScreen() const;
   void renderOverlaySleepScreen() const;
   bool canSnapshotOverlayBackground = false;
   bool overlayBackgroundBufferStored = false;
